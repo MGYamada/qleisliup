@@ -1,0 +1,61 @@
+name: Toolchains, manager lifecycle, and authenticated installation
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    name: ${{ matrix.target }} / Rust ${{ matrix.toolchain }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain: ["1.85.0", "stable"]
+        target:
+          - x86_64-unknown-linux-musl
+          - x86_64-apple-darwin
+          - aarch64-apple-darwin
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-24.04
+          - target: x86_64-apple-darwin
+            os: macos-15-intel
+          - target: aarch64-apple-darwin
+            os: macos-14
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Prepare Rust toolchain
+        run: rustup toolchain install '${{ matrix.toolchain }}' --profile minimal --component clippy --component rustfmt --target '${{ matrix.target }}'
+      - name: Prepare Linux linker
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes musl-tools build-essential cmake
+      - name: Check formatting
+        run: |
+          cargo +${{ matrix.toolchain }} fmt --all --check
+          rustup run '${{ matrix.toolchain }}' rustfmt --edition 2024 --check tests/fixtures/proxy_tool.rs
+          rustup run '${{ matrix.toolchain }}' rustfmt --edition 2024 --check tests/fixtures/manager_tool.rs
+      - name: Fetch locked implementation dependencies
+        run: cargo +${{ matrix.toolchain }} fetch --locked --target '${{ matrix.target }}'
+      - name: Build
+        run: cargo +${{ matrix.toolchain }} build --frozen --target '${{ matrix.target }}'
+      - name: Check Rust diagnostics
+        run: cargo +${{ matrix.toolchain }} clippy --frozen --all-targets --target '${{ matrix.target }}' -- -D warnings
+      - name: Test selection, proxies, TUF, and manager/toolchain transactions
+        run: cargo +${{ matrix.toolchain }} test --frozen --all-targets --target '${{ matrix.target }}'
+      - name: Smoke-check CLI, local links, and compiler proxies
+        run: sh scripts/check_cli.sh 'target/${{ matrix.target }}/debug/qleisliup'
+      - name: Check tracked whitespace and lockfile stability
+        run: |
+          git diff --check
+          git diff --exit-code -- Cargo.lock
