@@ -1,4 +1,5 @@
 mod archive;
+mod cleanup;
 mod cli;
 mod declaration;
 mod distribution;

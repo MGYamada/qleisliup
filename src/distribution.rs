@@ -19,10 +19,7 @@ use tough::{
 use url::Url;
 
 use crate::error::{Error, Result};
-use crate::{
-    files,
-    state::{Home, required_json},
-};
+use crate::{files, state::Home};
 
 pub(crate) const SMALL_TARGET: u64 = 1024 * 1024;
 pub(crate) const ARCHIVE_TARGET: u64 = 512 * 1024 * 1024;
@@ -108,6 +105,24 @@ struct Current {
     generation: String,
 }
 
+pub(crate) fn current_generation(state: &Path) -> Result<Option<String>> {
+    let pointer = state.join("current.json");
+    let Some(bytes) = files::read_optional(&pointer)? else {
+        return Ok(None);
+    };
+    let current: Current = serde_json::from_slice(&bytes).map_err(|e| Error::file(&pointer, e))?;
+    crate::state::schema(current.schema, &pointer)?;
+    if !current.generation.starts_with("state-")
+        || !current
+            .generation
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+    {
+        return Err(Error::file(&pointer, "invalid metadata generation"));
+    }
+    Ok(Some(current.generation))
+}
+
 pub(crate) struct Client {
     repository: Repository,
     work: TempDir,
@@ -132,22 +147,8 @@ impl Client {
             .prefix("work-")
             .tempdir_in(&state)
             .map_err(|e| Error::file(&state, e))?;
-        let pointer = state.join("current.json");
-        if files::read_optional(&pointer)?.is_some() {
-            let current: Current = required_json(&pointer)?;
-            crate::state::schema(current.schema, &pointer)?;
-            if !current.generation.starts_with("state-")
-                || !current
-                    .generation
-                    .bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || b == b'-')
-            {
-                return Err(Error::file(&pointer, "invalid metadata generation"));
-            }
-            copy_store(
-                &state.join("generations").join(current.generation),
-                work.path(),
-            )?;
+        if let Some(generation) = current_generation(&state)? {
+            copy_store(&state.join("generations").join(generation), work.path())?;
         } else {
             if source.root.len() as u64 > SMALL_TARGET {
                 return Err(Error::operational("trusted root exceeds metadata limit"));
@@ -329,7 +330,7 @@ fn checkpoint(state: &Path, work: &Path) -> Result<()> {
         .and_then(|n| n.to_str())
         .ok_or_else(|| Error::operational("invalid generated metadata name"))?
         .to_owned();
-    let kept = snapshot.keep();
+    let _kept = snapshot.keep();
     files::sync_directory(&generations)?;
     let bytes = serde_json::to_vec(&Current {
         schema: 1,
@@ -337,22 +338,11 @@ fn checkpoint(state: &Path, work: &Path) -> Result<()> {
     })
     .map_err(|e| Error::operational(e.to_string()))?;
     files::replace(state, "current.json", &bytes, 0o600)?;
-    // The new pointer is durable. Old snapshots are no longer referenced; failed
-    // cleanup is harmless and can be retried at the next checkpoint.
-    if let Ok(entries) = fs::read_dir(&generations) {
-        for entry in entries.flatten() {
-            if entry.path() != kept
-                && entry
-                    .file_name()
-                    .to_str()
-                    .is_some_and(|n| n.starts_with("state-"))
-                && entry.file_type().is_ok_and(|t| t.is_dir())
-            {
-                let _ = fs::remove_dir_all(entry.path());
-            }
-        }
-    }
-    Ok(())
+    crate::cleanup::metadata_generations(state).map_err(|error| {
+        Error::operational(format!(
+            "metadata checkpoint published; stale cleanup failed: {error}"
+        ))
+    })
 }
 
 fn validate_cached(path: &Path, bytes: &[u8]) -> Result<()> {

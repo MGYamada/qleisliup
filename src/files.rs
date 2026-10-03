@@ -209,7 +209,7 @@ impl Lock {
 }
 
 #[cfg(unix)]
-fn open_directory(path: &Path) -> Result<File> {
+pub(crate) fn open_directory(path: &Path) -> Result<File> {
     use rustix::fs::{Mode, OFlags, open};
     open(
         path,

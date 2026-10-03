@@ -140,6 +140,7 @@ pub(crate) fn run<T: Transport + Clone + 'static>(
     preflight(home, host, &mode)?;
     let _lock = home.lock()?;
     preflight(home, host, &mode)?;
+    crate::cleanup::stale(home, &_lock)?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
         .enable_all()

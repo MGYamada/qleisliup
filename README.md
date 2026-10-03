@@ -81,7 +81,8 @@ State lives in `$HOME/.qleisliup`; `QLEISLIUP_HOME` selects another absolute
 directory. Inspection does not create it. Pin/default mutations create a home
 lock as needed; link/unlink also serialize state changes through that lock.
 Default stores an installed exact version; `default stable` freezes the exact
-version from a local authenticated observation. Symlink destinations
+version from a local authenticated observation, reread while holding the mutation
+lock. Symlink destinations
 and malformed existing records are rejected.
 
 ## Adopted distribution direction
@@ -123,10 +124,18 @@ bounded extraction, rejects unsafe archive entries, validates the complete
 inventory, writes a receipt, then publishes by an exclusive atomic rename.
 Archive entries that alias the installer receipt on the extraction filesystem
 are rejected, including case aliases on macOS.
+Extracted executables use mode 0755 and data files use 0644, regardless of unsafe
+ordinary permission bits in the authenticated archive; privileged bits are rejected.
 Uninstall preserves authentication/identity history and refuses the global default.
 A receipt describes authentication at installation; it does not revalidate local
 bytes or establish mathematical correctness. Real upstream bundles and the
 production security configuration still require separate validation.
+
+Lifecycle mutations reclaim bounded amounts of abandoned private staging under
+the home lock, including unreferenced metadata generations. Cleanup protects the
+committed metadata generation and rejects unexpected symlinks, special files, and
+filesystem boundaries. Offline inspection, proxies, and reuse of an existing exact
+installation do not trigger cleanup. See the [cleanup contract](docs/specification.md#stale-private-data-cleanup).
 
 ## Bootstrap and manager update
 

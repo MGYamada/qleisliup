@@ -2,6 +2,16 @@
 
 Product versions are independent of distribution and state schema versions.
 
+## Unreleased
+
+- Normalize authenticated archive executables to mode 0755 and data files to
+  0644; retain rejection of privileged modes and missing executable bits (#2).
+- Resolve `default stable` again under the home mutation lock before validating
+  and saving its exact version, avoiding a concurrent channel-update race (#3).
+- Reclaim bounded abandoned install/removal, metadata, bootstrap, and update
+  staging under the home lock, preserving committed state and rejecting unsafe
+  filesystem substitutions (#4).
+
 ## 0.1.0 - 2026-10-03
 
 - Start a std-only Rust 2024 executable with Rust 1.85 as the MSRV, tracked

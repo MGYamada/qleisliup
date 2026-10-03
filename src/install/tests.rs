@@ -301,6 +301,257 @@ fn rejected<T: std::fmt::Debug>(result: Result<T>, message: &str) {
     assert!(error.contains(message), "{error}");
 }
 
+#[cfg(unix)]
+#[test]
+fn signed_archive_modes_are_normalized_before_publication() {
+    use std::io::Read;
+    use std::os::unix::fs::PermissionsExt;
+    for mode in [0o001, 0o010, 0o777, 0o755] {
+        let mut fixture = Fixture::new();
+        let original = &fixture.contents[&format!("releases/0.4.0/{HOST}.tar.zst")];
+        let decoded = zstd::stream::decode_all(original.as_slice()).unwrap();
+        let mut builder = tar::Builder::new(Vec::new());
+        for entry in tar::Archive::new(decoded.as_slice()).entries().unwrap() {
+            let mut entry = entry.unwrap();
+            let path = entry.path().unwrap().to_string_lossy().into_owned();
+            let mut bytes = Vec::new();
+            entry.read_to_end(&mut bytes).unwrap();
+            let executable = path.contains("/bin/");
+            append(
+                &mut builder,
+                &path,
+                &bytes,
+                if executable { mode } else { 0o666 },
+                tar::EntryType::Regular,
+            );
+        }
+        let archive =
+            zstd::stream::encode_all(builder.into_inner().unwrap().as_slice(), 1).unwrap();
+        fixture.replace_archive("0.4.0", archive);
+        fixture.publish(2, FUTURE, FUTURE, true);
+        fixture.install("0.4.0").unwrap();
+        let root = fixture.final_path("0.4.0");
+        for name in ["qleisli", "qargo", "qlippy", "qlifmt", "qlidoc"] {
+            let path = root.join("bin").join(name);
+            assert_eq!(
+                fs::metadata(&path).unwrap().permissions().mode() & 0o7777,
+                0o755
+            );
+            assert!(
+                std::process::Command::new(path)
+                    .output()
+                    .unwrap()
+                    .status
+                    .success()
+            );
+        }
+        for name in ["toolchain.json", "LICENSE", "NOTICE"] {
+            assert_eq!(
+                fs::metadata(root.join(name)).unwrap().permissions().mode() & 0o7777,
+                0o644
+            );
+        }
+    }
+}
+
+#[test]
+fn stable_default_resolves_the_channel_after_acquiring_the_mutation_lock() {
+    let mut fixture = Fixture::new();
+    fixture.install("stable").unwrap();
+    fixture.bundle("0.5.0", None);
+    fixture.publish(2, FUTURE, FUTURE, true);
+    fixture.install("0.5.0").unwrap();
+    let lock = fixture.home.lock().unwrap();
+    let (ready, started) = std::sync::mpsc::channel();
+    std::thread::scope(|scope| {
+        let home = &fixture.home;
+        let operation = scope.spawn(|| {
+            crate::selection::set_default_with(home, &Selector::Stable, HOST, || {
+                ready.send(()).unwrap();
+            })
+        });
+        // The operation has observed the old channel in its nonmutating preflight
+        // and can only acquire the lock after this channel mutation is committed.
+        started
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .unwrap();
+        home.observe_stable(&ExactVersion::parse("0.5.0").unwrap(), "a".repeat(64))
+            .unwrap();
+        drop(lock);
+        assert_eq!(operation.join().unwrap().unwrap().to_string(), "0.5.0");
+    });
+    assert!(
+        matches!(fixture.home.settings().unwrap().default, DefaultValue::Version(v) if v == "0.5.0")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn lifecycle_cleanup_reclaims_only_private_staging_and_preserves_committed_state() {
+    use std::os::unix::fs::symlink;
+    let mut fixture = Fixture::new();
+    fixture.install("stable").unwrap();
+    fixture.bundle("0.5.0", None);
+    fixture.publish(2, FUTURE, FUTURE, true);
+    fixture.install("0.5.0").unwrap();
+    crate::selection::set_default(&fixture.home, &ExactVersion::parse("0.4.0").unwrap(), HOST)
+        .unwrap();
+    let home = &fixture.home.path;
+    write(&home.join("bin/qleisliup"), b"existing manager");
+    write(
+        &home.join("bin/.qleisliup-managed.json"),
+        b"existing marker",
+    );
+    symlink("qleisliup", home.join("bin/qli")).unwrap();
+    let private = [
+        "toolchains/.transactions/install-AbCd01",
+        "toolchains/.transactions/uninstall-AbCd02",
+        "metadata/official/work-AbCd03",
+        "metadata/official/generations/state-AbCd04",
+        ".qleisliup-manager-AbCd05",
+        "bin/.qleisliup-manager-AbCd06",
+    ];
+    for name in private {
+        write(&home.join(name).join("payload/data"), b"abandoned");
+    }
+    let bootstrap = home.join(private[4]).join("bin");
+    fs::create_dir(&bootstrap).unwrap();
+    for name in ["qli", "qleisli", "qargo", "qlippy", "qlifmt", "qlidoc"] {
+        symlink("qleisliup", bootstrap.join(name)).unwrap();
+    }
+    write(&home.join(".qleisliup-manager-not-owned/sentinel"), b"keep");
+    let protected = [
+        home.join("settings.json"),
+        home.join("identities.json"),
+        home.join("channels.json"),
+        home.join("metadata/official/current.json"),
+        fixture.current().join("root.json"),
+        home.join("bin/qleisliup"),
+        home.join("bin/.qleisliup-managed.json"),
+        fixture.final_path("0.4.0").join("toolchain.json"),
+    ];
+    let before: Vec<_> = protected.iter().map(|p| fs::read(p).unwrap()).collect();
+    uninstall(&fixture.home, &ExactVersion::parse("0.5.0").unwrap(), HOST).unwrap();
+    for name in private {
+        assert!(!home.join(name).exists(), "left {name}");
+    }
+    for (path, bytes) in protected.iter().zip(before) {
+        assert_eq!(fs::read(path).unwrap(), bytes);
+    }
+    assert_eq!(
+        fs::read_link(home.join("bin/qli")).unwrap(),
+        Path::new("qleisliup")
+    );
+    assert!(home.join(".qleisliup-manager-not-owned/sentinel").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn lifecycle_cleanup_rejects_symlinks_special_files_and_invalid_pointers() {
+    use std::os::unix::fs::symlink;
+    for attack in 0..6 {
+        let fixture = Fixture::new();
+        fixture.install("stable").unwrap();
+        let home = &fixture.home.path;
+        let outside = home.parent().unwrap().join("outside");
+        write(&outside.join("sentinel"), b"untouched");
+        let stale = home.join("toolchains/.transactions/install-AbCd01");
+        match attack {
+            0 => symlink(&outside, &stale).unwrap(),
+            1 => {
+                fs::create_dir(&stale).unwrap();
+                symlink(&outside, stale.join("escape")).unwrap();
+            }
+            2 => {
+                fs::create_dir(&stale).unwrap();
+                let socket = home.parent().unwrap().join("socket");
+                let _listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+                fs::rename(socket, stale.join("socket")).unwrap();
+            }
+            3 => {
+                let transactions = home.join("toolchains/.transactions");
+                fs::remove_dir(&transactions).unwrap();
+                symlink(&outside, transactions).unwrap();
+            }
+            4 => {
+                write(&stale.join("data"), b"keep on invalid pointer");
+                write(
+                    &home.join("metadata/official/current.json"),
+                    br#"{"schema":1,"generation":"../outside"}"#,
+                );
+            }
+            5 => {
+                let staging = home.join(".qleisliup-manager-AbCd02/bin");
+                fs::create_dir_all(&staging).unwrap();
+                symlink(&outside, staging.join("qli")).unwrap();
+            }
+            _ => unreachable!(),
+        }
+        let pointer = fs::read(home.join("metadata/official/current.json")).unwrap();
+        let identity = fs::read(home.join("identities.json")).unwrap();
+        assert!(
+            uninstall(&fixture.home, &ExactVersion::parse("0.4.0").unwrap(), HOST).is_err(),
+            "accepted attack {attack}"
+        );
+        assert!(fixture.final_path("0.4.0").join("bin/qleisli").exists());
+        assert_eq!(fs::read(home.join("identities.json")).unwrap(), identity);
+        assert_eq!(
+            fs::read(home.join("metadata/official/current.json")).unwrap(),
+            pointer
+        );
+        assert_eq!(fs::read(outside.join("sentinel")).unwrap(), b"untouched");
+        if attack == 4 {
+            assert!(stale.join("data").exists());
+        }
+    }
+}
+
+#[test]
+fn stale_cleanup_is_bounded_and_preserves_active_generation_aliases() {
+    let fixture = Fixture::new();
+    fixture.install("stable").unwrap();
+    let home = &fixture.home.path;
+    let active = fixture.current();
+    let state = home.join("metadata/official");
+    let renamed = state.join("generations/state-aBcD01");
+    fs::rename(&active, &renamed).unwrap();
+    let alias = state.join("generations/state-AbCd01");
+    let generation = if alias.exists() {
+        "state-AbCd01"
+    } else {
+        "state-aBcD01"
+    };
+    write(
+        &state.join("current.json"),
+        &serde_json::to_vec(&json!({"schema":1,"generation":generation})).unwrap(),
+    );
+    let before = fs::read(renamed.join("root.json")).unwrap();
+    for index in 0..33 {
+        write(
+            &home.join(format!(".qleisliup-manager-{index:06}/data")),
+            b"abandoned",
+        );
+    }
+    let lock = fixture.home.lock().unwrap();
+    crate::cleanup::stale(&fixture.home, &lock).unwrap();
+    let count = || {
+        fs::read_dir(home)
+            .unwrap()
+            .filter(|e| {
+                e.as_ref()
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(".qleisliup-manager-")
+            })
+            .count()
+    };
+    assert_eq!(count(), 1);
+    crate::cleanup::stale(&fixture.home, &lock).unwrap();
+    assert_eq!(count(), 0);
+    assert_eq!(fs::read(renamed.join("root.json")).unwrap(), before);
+}
+
 #[test]
 fn authenticated_install_receipt_offline_reuse_and_inspection() {
     let fixture = Fixture::new();
@@ -964,7 +1215,29 @@ fn killed_install_retains_old_release_default_and_metadata_then_retries() {
     let list = crate::selection::list(&fixture.home).unwrap();
     assert!(list.contains("0.4.0"));
     assert!(!list.contains("0.5.0"));
+    let abandoned: Vec<_> = fs::read_dir(fixture.home.path.join("toolchains/.transactions"))
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .collect();
+    assert!(!abandoned.is_empty());
+    let abandoned_work: Vec<_> = fs::read_dir(fixture.home.path.join("metadata/official"))
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| {
+            p.file_name()
+                .unwrap()
+                .to_string_lossy()
+                .starts_with("work-")
+        })
+        .collect();
+    assert!(!abandoned_work.is_empty());
     fixture.install("0.5.0").unwrap();
+    assert!(
+        abandoned
+            .iter()
+            .chain(&abandoned_work)
+            .all(|path| !path.exists())
+    );
     let timestamp: Value =
         serde_json::from_slice(&fs::read(fixture.current().join("timestamp.json")).unwrap())
             .unwrap();
