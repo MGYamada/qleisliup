@@ -1,4 +1,4 @@
-# qleisliup 0.1.1 implementation plan
+# qleisliup 0.1.2 implementation plan
 
 ## Delivery boundary
 
@@ -7,8 +7,7 @@ offline selection, exact defaults/pins, local links, Unix proxies, and TUF
 transactional toolchain installation, together
 with the adopted [specification](specification.md), development files, tests,
 and CI. Production endpoints/trust remain unconfigured. The Cargo package
-version is 0.1.1, with source packaging prepared for crates.io. Registry publication
-is separate and has not been performed as part of this preparation. The package
+version is 0.1.2, with a source release for crates.io and GitHub. The package
 includes no prebuilt manager binary or available Qleisli distribution.
 
 Keep delivery in this order: **local selection → links and proxies → TUF and
@@ -473,14 +472,19 @@ No registry upload, GitHub release, tag, or production distribution was created.
 
 **Requested direction; production distribution remains planned.** Deliver a
 verified native bootstrap plus prebuilt Qleisli toolchains for the initial three
-hosts. End users must not need Cargo, rustc, Rust headers/libraries, a C/C++
-compiler, or CMake. See the [delivery plan](cargo-free-installation.md).
+hosts. Native CLI users must not need Cargo, rustc, Rust headers/libraries,
+Lean/Lake, Python, a C/C++ compiler, or CMake. Python connections are separately
+distributed and use project-local uv environments. See the
+[delivery plan](cargo-free-installation.md) and
+[environment dependency policy](environment-dependencies.md).
 
 Current preparation builds both release-mode manager executables and checks
-local CLI/link/proxy behavior with a restricted PATH whose Rust developer tool
-names are failure traps. This is configured for both Rust compilers on each CI
-host. Test fixtures do not establish real toolchain installation or production
-authentication. No release upload or production trust configuration is added.
+local CLI/link/proxy behavior with a restricted PATH whose Rust, Lean, Python,
+and native build-tool names are failure traps. A reusable command guard and
+its negative checks also support future real bundle scenarios. This is
+configured for both Rust compilers on each CI host. Test fixtures do not
+establish real toolchain installation or production authentication. No release
+upload or production trust configuration is added.
 
 Remaining delivery work, in order:
 
@@ -490,12 +494,20 @@ Remaining delivery work, in order:
    root, rotation/expiry policy, and verified bootstrap acquisition method.
 3. Configure the client with those approved public inputs and stage signed
    toolchain and manager targets through the separate release process.
-4. On clean hosts without Rust developer tools, verify bootstrap, install,
-   exact/default/project selection, offline execution, updates, and rejection
-   of invalid distributions before making the end-user path available.
+4. On clean hosts without Rust/Lean/Python or native build tools, verify bootstrap,
+   install, exact/default/project selection, offline execution, updates, and
+   rejection of invalid distributions before making the end-user path available.
 
 No download URL, signing identity, or initial compiler bundle version is inferred
 from examples. Upstream source/build changes belong to their own repositories.
+
+The adopted environment work proceeds from this repository's policy/runtime
+checks to real Rust-built bundle validation, then a native Lean kernel only
+after its upstream distribution/compatibility gates. Python wheel delivery,
+exactly locked sample projects, and compatibility CI are a separate upstream
+task. Keep interpreter/package acquisition outside native operations and retain
+the current CLI, pin schema, verifier authority, and TUF trust boundary. No
+cross-language dependency resolver or qargo build hooks are introduced.
 
 ### Preparation validation, 2026-10-03
 
@@ -569,6 +581,121 @@ and GitHub release record final integrated CI, clean-checkout source packaging,
 publish dry-run, isolated installation, and registry publication results.
 Production endpoints/trust and real Cargo-free distribution remain unconfigured;
 this release supplies source through crates.io and GitHub.
+
+## Environment dependency boundary validation, 2026-10-03
+
+The adopted policy separates distribution-time Rust/Lean dependencies from
+project-local Python environments and separate wheel delivery. Public manager
+commands, pin/state schemas, Rust sources, and dependency versions are unchanged.
+The reusable restricted-PATH guard now checks 25 Rust, Lean, Python, environment
+manager, and native build-tool names. Its negative cases prove that invoking a
+trapped tool still fails when the scenario swallows the tool's failure. Argument
+transport, ordinary exit propagation, invalid invocation, and inherited-PATH
+exclusion checks also passed.
+
+Local validation ran on macOS ARM64 with the locked graph, offline:
+
+| Compiler | Release build, both binaries | CLI and restricted-PATH smoke | Source package verification |
+| --- | --- | --- | --- |
+| Rust 1.85.0 | Passed | Passed | Passed |
+| Rust 1.98.1, installed Homebrew stable release | Passed | Passed | Passed |
+
+Both source archives contain 49 files, including the new policy, reusable guard,
+and guard checks. The scripts extracted by Cargo passed their guard and native
+smoke checks against the corresponding release candidates, including reading
+the normalized package manifest. Shell scripts/document examples, local document
+links/anchors, CI YAML and its unchanged six-job matrix, whitespace, and unchanged
+Cargo.lock were checked. The prior integrated Rust unit/lint checks remain the
+Rust code checkpoint; this change adds documentation, shell checks, packaging
+entries, and CI wiring only.
+
+Remote CI and other-host execution were not run here. No real complete compiler
+bundle, relocated Lean kernel, Python wheel/environment compatibility, or live
+production installation was validated by these fixtures. Those remain separate
+upstream and production acceptance scenarios. No sibling repository, signing
+key, distribution metadata, release, or registry publication was changed.
+
+## Version 0.1.2 validation, 2026-10-03
+
+Cargo.toml and the root Cargo.lock entry now identify qleisliup 0.1.2. Dependency
+versions are unchanged. Current docs and release notes use 0.1.2; historical
+validation records and the then-published 0.1.1 registry installation example were
+kept separate at this preparation checkpoint. No registry upload, GitHub release,
+or tag was created at that checkpoint; release execution follows separately.
+
+Checks ran on macOS ARM64 with the locked graph, offline:
+
+| Compiler | Debug/release builds, both binaries | Tests | Formatting | Clippy, warnings denied | CLI/runtime checks | Source package verification |
+| --- | --- | --- | --- | --- | --- | --- |
+| Rust 1.85.0 | Passed | 145 passed | Passed | Passed | Passed | Passed |
+| Rust 1.98.1, installed Homebrew stable release | Passed | 145 passed | Passed | Passed | Passed | Passed |
+
+Both binaries report 0.1.2. Formatting covers both standalone native fixtures;
+runtime checks include the developer-tool guard's negative cases. The Unix-socket
+fixture required running the full test suites outside the local execution
+sandbox. Both 50-file source archives passed Cargo verification, and their
+extracted runtime smoke scripts passed against the corresponding native release
+candidates. Local documentation links/shell examples and the version-only
+Cargo.lock change were checked. Other-host execution, remote CI, production
+distribution, and real upstream bundle/Lean/Python compatibility remain pending.
+
+## Lifecycle hardening (#7–#9), 2026-10-03
+
+Owned home/state/staging directories now request mode 0700 explicitly. Existing
+group/world-writable owned directories fail closed without automatic permission
+repair, including during offline home and installed-release inspection. An
+isolated child with `umask 000` exercises toolchain install/uninstall, bootstrap,
+and self-update and inspects live staging permissions. Existing unsafe parents
+are rejected before network access. Project pin directories and unauthenticated
+local toolchain links retain their separate permission policy.
+
+Atomic state writes use randomized exclusive temporary names and reclaim at
+most 32 reserved files after scanning at most 4,096 directory entries, under the
+existing mutation lock. The exact legacy PID/counter namespace is also reclaimed.
+Tests kill a child between file synchronization and rename, then verify preserved
+committed state, lock release, successful retry, and abandoned-file removal.
+Additional tests cover cleanup limits, unrelated records, symlink/directory
+substitution, and authenticated bundle files whose names resemble state
+temporaries. Staged receipt writes do not reclaim bundle payload files.
+
+TUF pointer loading and cleanup now share the canonical `state-` plus six ASCII
+alphanumeric characters rule. Canonical/noncanonical pointer tests and the
+existing active-generation inode/case-alias regression pass.
+
+Checks ran against the locked graph on macOS ARM64:
+
+| Compiler | Debug/release builds, both binaries | Tests | Formatting | Clippy, warnings denied | CLI/runtime checks | Source package verification |
+| --- | --- | --- | --- | --- | --- | --- |
+| Rust 1.85.0 | Passed | 173 passed | Passed | Passed | Passed | Passed, offline |
+| Rust 1.98.1, installed Homebrew stable release | Passed | 173 passed | Passed | Passed | Passed | Passed, offline |
+
+There are 108 named cases: 65 shared unit cases executed by both binary
+harnesses, plus 43 integration cases. Formatting includes both standalone native
+fixtures; runtime checks include guard rejection and restricted-PATH execution.
+The Unix-socket fixture requires running the suites outside the local execution
+sandbox. Both 50-file source packages preserve the locked dependency graph and
+final Rust sources. Cargo.lock differs from 0.1.1 only in the manager's version.
+The explicit include list now excludes `.DS_Store`; the earlier package checks
+accepted two ignored Finder metadata files, which are absent from final packages.
+Shell syntax, documentation links, CI YAML/six-job matrix, and whitespace checks
+passed. Other-host execution is checked separately by CI; filesystem mount
+boundaries, power-loss/storage faults, real upstream bundles, Lean/Python
+compatibility, live distribution, and independent security review remain
+separate acceptance scenarios. Production endpoints/trust remain unconfigured.
+
+## Version 0.1.2 release preflight, 2026-10-03
+
+The user separately authorized crates.io and GitHub publication of 0.1.2.
+Current installation examples and release documentation now target that version;
+the earlier preparation-only validation checkpoints remain historical records.
+No runtime code or locked dependency version changed during this finalization.
+
+The exact Cargo.lock passed cargo-audit 0.22.2 using the current RustSec database,
+commit `ef6173cbc5c50ec8166f9a5b28f07834144373ee` (1,290 advisories): 217 dependencies,
+zero vulnerabilities, zero warnings, and no ignored advisories. Publication
+requires the final supported-host CI results, clean package/dry-run verification,
+and a matching merged source tree. The GitHub release records those results,
+the release commit, and the checksum of the published source crate.
 
 ## Production prerequisites and release boundary
 

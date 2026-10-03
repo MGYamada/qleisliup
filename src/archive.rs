@@ -201,7 +201,7 @@ fn make_directories(
             // This private tree contains only previously recorded nodes. A new
             // spelling that already exists is a filesystem alias (case folding
             // or Unicode normalization), and must not merge archive directories.
-            fs::create_dir(&destination).map_err(|error| {
+            files::create_private_directory(&destination).map_err(|error| {
                 if error.kind() == io::ErrorKind::AlreadyExists {
                     archive_error(format!(
                         "duplicate or aliased archive directory: {}",

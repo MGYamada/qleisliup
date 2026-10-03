@@ -6,7 +6,11 @@ The intended user experience is native toolchain installation and version
 management through qleisliup, analogous to a compiler toolchain manager. A user
 obtains a verified `qleisliup-init`, installs a prebuilt distribution, and selects
 an exact Qleisli version. Rust and Cargo remain implementation build tools;
-end users need neither them nor a C/C++ compiler or CMake.
+end users need neither them nor Lean, Lake, Python, a C/C++ compiler, or CMake
+for the native CLI. Python connections use separately distributed wheels and
+project-local environments. The [environment dependency policy](environment-dependencies.md)
+defines fixed build inputs, native Lean delivery gates, Python locks, and
+explicit handoff of the selected compiler.
 
 **This production installation path is not available yet.** The manager already
 implements TUF verification, transactional installation, exact selection, Unix
@@ -64,7 +68,9 @@ or download. Users can retain several installed versions simultaneously.
 | Exact Qleisli distribution | Native compiler, matching stdlib identity, qargo and its auxiliary executables, truthful checker/verifier bindings, LICENSE and NOTICE | The manager's bundle format and synthetic acceptance tests exist; real upstream bundle validation is pending. |
 | Initial bootstrap authenticity | A documented verification method for the first downloaded native executable | Pending; a checksum fetched with an otherwise unverified executable is not a new trust authority. |
 | Production TUF repository | Owned metadata/target endpoints, approved initial public root, role custodians/thresholds, expiry and rotation procedures | Unconfigured. Test roots must never be used. |
-| Clean-machine acceptance | Actual install, switch, pin, proxy, and update workflows without Rust developer tools | Local fixture checks exist; real distribution acceptance remains pending. |
+| Clean-machine acceptance | Actual install, switch, pin, proxy, and update workflows without Rust, Lean, Python, or native build tools | Local fixture checks exist; real distribution acceptance remains pending. |
+| Native Lean kernel | Compatible upstream release, complete runtime files, relocated native execution, truthful verifier arrangement | Pending upstream gates; installing a kernel does not transfer acceptance authority. |
+| Python connections | Separate wheel/PyPI delivery, fixed Python and package locks, explicit absolute compiler path, compatibility CI | Separate upstream work; not installed or authenticated by qleisliup. |
 
 The distribution boundary remains the
 [specified complete bundle](specification.md#distribution-and-internal-manifests).
@@ -128,20 +134,26 @@ Maintainers can build and inspect the native manager candidates:
 ```sh
 cargo fetch --locked
 cargo build --release --frozen --bins
+sh scripts/check_runtime_guard.sh
 sh scripts/check_cargo_free.sh target/release/qleisliup
 ```
 
-The check runs the existing CLI smoke harness with a restricted PATH. Its
-`cargo`, `rustc`, `rustdoc`, and `rustup` entries log invocation and fail, and no
-inherited PATH entry can provide the real developer tools. The harness verifies
-help/version, local registration and compiler proxies, and truthful rejection
-of requests that lack production configuration. It uses a small shell fixture
+The check runs the existing CLI smoke harness through
+`scripts/without_developer_tools.sh` with a restricted PATH. Common Rust, Lean,
+Python, package/environment manager, and C/C++ build-tool names log invocation
+and fail, even when the scenario ignores their exit status. The separate guard
+check verifies these rejections and exclusion of inherited PATH entries.
+The harness verifies help/version, local registration and compiler proxies,
+and truthful rejection of requests that lack production configuration. It uses a small shell fixture
 for the selected compiler. It does not exercise real Qleisli semantics, provide
-production authentication, or prove successful network installation.
+production authentication, or prove successful network installation. This is a
+PATH dependency check, not a sandbox for absolute executable paths or networking.
+The helper can also run a separately prepared native bundle scenario; see the
+[validation boundary](environment-dependencies.md#validation-and-delivery-order).
 
 CI builds and checks release candidates on its existing compiler/host matrix.
 It does not publish them. The check script and design documents are included in
-the crates.io source package so the same check can run from an extracted source
+the crates.io source package so the same checks can run from an extracted source
 archive. Release uploads, signing ceremonies, and production metadata are
 separate operations.
 
@@ -149,7 +161,7 @@ separate operations.
 
 These are planned acceptance checks, not completed results:
 
-1. On each clean supported host with no Cargo/rustc/rustup/C/C++ toolchain, verify
+1. On each clean supported host with no Rust/Lean/Python or C/C++ build tools, verify
    the native bootstrap out of band and install the managed manager/proxies.
 2. Authenticate and install two real exact toolchain releases. Verify actual
    compiler and qargo behavior, embedded resources, and the linked checker
@@ -165,6 +177,13 @@ These are planned acceptance checks, not completed results:
 6. Reject invalid/expired metadata, changed release identities, unsupported
    hosts, and incompatible binaries. Exercise key rotation and old-client
    recovery with the actual release infrastructure.
+7. For a release with a supported native Lean kernel, execute after relocation
+   without the build checkout/caches. Check explicit kernel selection against a
+   conflicting PATH and fail on a missing, rejecting, or incompatible kernel.
+8. In the separate Python compatibility CI, reproduce two isolated locked
+   environments, bind each to the intended exact compiler, and execute offline
+   after preparation. Missing optional native wheels must not trigger source
+   builds. Unsupported combinations must remain visibly unsupported.
 
 Record host/linkage evidence and observed results before advertising this path
 as available. Initial trust and metadata expiry cannot be bypassed to turn the

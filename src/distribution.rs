@@ -112,12 +112,7 @@ pub(crate) fn current_generation(state: &Path) -> Result<Option<String>> {
     };
     let current: Current = serde_json::from_slice(&bytes).map_err(|e| Error::file(&pointer, e))?;
     crate::state::schema(current.schema, &pointer)?;
-    if !current.generation.starts_with("state-")
-        || !current
-            .generation
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b == b'-')
-    {
+    if !files::generated_name(current.generation.as_bytes(), b"state-") {
         return Err(Error::file(&pointer, "invalid metadata generation"));
     }
     Ok(Some(current.generation))
@@ -143,10 +138,7 @@ impl Client {
         let state = metadata.join("official");
         files::create_directory(&state)?;
         files::create_directory(&state.join("generations"))?;
-        let work = tempfile::Builder::new()
-            .prefix("work-")
-            .tempdir_in(&state)
-            .map_err(|e| Error::file(&state, e))?;
+        let work = files::temporary_directory(&state, "work-")?;
         if let Some(generation) = current_generation(&state)? {
             copy_store(&state.join("generations").join(generation), work.path())?;
         } else {
@@ -275,7 +267,7 @@ fn tuf_error(error: impl std::fmt::Display) -> Error {
 }
 
 fn copy_store(source: &Path, destination: &Path) -> Result<()> {
-    files::directory(source)?;
+    files::managed_directory(source)?;
     let mut count = 0;
     let mut total = 0_u64;
     for entry in fs::read_dir(source).map_err(|e| Error::file(source, e))? {
@@ -319,10 +311,7 @@ fn copy_store(source: &Path, destination: &Path) -> Result<()> {
 
 fn checkpoint(state: &Path, work: &Path) -> Result<()> {
     let generations = state.join("generations");
-    let snapshot = tempfile::Builder::new()
-        .prefix("state-")
-        .tempdir_in(&generations)
-        .map_err(|e| Error::file(&generations, e))?;
+    let snapshot = files::temporary_directory(&generations, "state-")?;
     copy_store(work, snapshot.path())?;
     let generation = snapshot
         .path()

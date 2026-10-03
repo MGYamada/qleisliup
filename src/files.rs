@@ -1,20 +1,54 @@
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::error::{Error, Result};
 
 const MAX_METADATA_BYTES: u64 = 1024 * 1024;
-static TEMP_ID: AtomicU64 = AtomicU64::new(0);
+
+// This namespace is shared by staging creation and stale-tree reclamation.
+pub(crate) fn generated_name(name: &[u8], prefix: &[u8]) -> bool {
+    name.strip_prefix(prefix)
+        .is_some_and(|suffix| suffix.len() == 6 && suffix.iter().all(u8::is_ascii_alphanumeric))
+}
+
+fn private_directory_builder() -> fs::DirBuilder {
+    let mut builder = fs::DirBuilder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder
+}
+
+// Exclusive creation is also needed while extracting archives: accepting an
+// existing directory there would merge filesystem aliases of distinct names.
+pub(crate) fn create_private_directory(path: &Path) -> std::io::Result<()> {
+    private_directory_builder().create(path)
+}
+
+pub(crate) fn temporary_directory(parent: &Path, prefix: &str) -> Result<tempfile::TempDir> {
+    managed_directory(parent)?;
+    let mut builder = tempfile::Builder::new();
+    builder.prefix(prefix).rand_bytes(6);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        builder.permissions(fs::Permissions::from_mode(0o700));
+    }
+    builder
+        .tempdir_in(parent)
+        .map_err(|e| Error::file(parent, e))
+}
 
 pub(crate) fn create_directory(path: &Path) -> Result<()> {
-    match fs::create_dir(path) {
+    match create_private_directory(path) {
         Ok(()) => {
             sync_directory(path)?;
             sync_parent(path)
         }
-        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => directory(path),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => managed_directory(path),
         Err(error) => Err(Error::file(path, error)),
     }
 }
@@ -28,8 +62,11 @@ pub(crate) fn create_home(path: &Path) -> Result<()> {
             fs::symlink_metadata(ancestor).is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound)
         })
         .collect();
-    fs::create_dir_all(path).map_err(|e| Error::file(path, e))?;
-    directory(path)?;
+    private_directory_builder()
+        .recursive(true)
+        .create(path)
+        .map_err(|e| Error::file(path, e))?;
+    managed_directory(path)?;
     for created in missing {
         sync_directory(created)?;
         sync_parent(created)?;
@@ -109,6 +146,30 @@ pub(crate) fn directory(path: &Path) -> Result<()> {
     Ok(())
 }
 
+pub(crate) fn managed_directory(path: &Path) -> Result<()> {
+    directory(path)?;
+    #[cfg(unix)]
+    {
+        let file = open_directory(path)?;
+        check_managed_directory(&file, path)
+    }
+    #[cfg(not(unix))]
+    Ok(())
+}
+
+#[cfg(unix)]
+pub(crate) fn check_managed_directory(file: &File, path: &Path) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    let metadata = file.metadata().map_err(|e| Error::file(path, e))?;
+    if !metadata.is_dir() || metadata.permissions().mode() & 0o022 != 0 {
+        return Err(Error::file(
+            path,
+            "managed directory must be real and must not be group- or world-writable; repair its permissions before retrying",
+        ));
+    }
+    Ok(())
+}
+
 pub(crate) fn regular(path: &Path, executable: bool) -> Result<()> {
     let metadata = fs::symlink_metadata(path).map_err(|error| Error::file(path, error))?;
     if !metadata.is_file() {
@@ -160,7 +221,7 @@ impl Lock {
     #[cfg(unix)]
     pub(crate) fn home(path: &Path) -> Result<Self> {
         use rustix::fs::{FlockOperation, Mode, OFlags, flock, open};
-        directory(path)?;
+        managed_directory(path)?;
         let lock_path = path.join(".mutation-lock");
         let file = File::from(
             open(
@@ -222,6 +283,30 @@ pub(crate) fn open_directory(path: &Path) -> Result<File> {
 
 #[cfg(unix)]
 pub(crate) fn replace(directory_path: &Path, name: &str, bytes: &[u8], mode: u32) -> Result<()> {
+    replace_with(directory_path, name, bytes, mode, true, || {})
+}
+
+// A staged bundle may contain authenticated files with temporary-looking names.
+// Its receipt must preserve those bytes; abandoned staging is reclaimed as a
+// whole transaction tree, never by scanning the bundle as a state directory.
+pub(crate) fn replace_staged(path: &Path, name: &str, bytes: &[u8], mode: u32) -> Result<()> {
+    #[cfg(unix)]
+    return replace_with(path, name, bytes, mode, false, || {});
+    #[cfg(not(unix))]
+    replace(path, name, bytes, mode)
+}
+
+// Callers hold the home mutation lock and, for a project pin, its directory
+// lock. Private transaction directories are protected by the same home lock.
+#[cfg(unix)]
+fn replace_with(
+    directory_path: &Path,
+    name: &str,
+    bytes: &[u8],
+    mode: u32,
+    reclaim: bool,
+    before_rename: impl FnOnce(),
+) -> Result<()> {
     use rustix::fs::{AtFlags, Mode, OFlags, openat, renameat, unlinkat};
     let directory = open_directory(directory_path)?;
     let destination = directory_path.join(name);
@@ -237,25 +322,39 @@ pub(crate) fn replace(directory_path: &Path, name: &str, bytes: &[u8], mode: u32
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
         Err(error) => return Err(Error::file(&destination, error)),
     }
-    let temporary = format!(
-        ".qleisliup-{}-{}.tmp",
-        std::process::id(),
-        TEMP_ID.fetch_add(1, Ordering::Relaxed)
-    );
-    let mut file = File::from(
-        openat(
-            &directory,
-            temporary.as_str(),
-            OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
-            Mode::from_raw_mode(mode as _),
-        )
-        .map_err(|error| Error::file(&destination, error))?,
-    );
+    if reclaim {
+        reclaim_state_temporaries(&directory, directory_path)?;
+    }
+    // tempfile supplies randomized names and retries exclusive-create collisions.
+    // Creation, rename, and cleanup remain relative to the opened directory.
+    let temporary = tempfile::Builder::new()
+        .prefix(".qleisliup-state-")
+        .rand_bytes(16)
+        .suffix(".tmp")
+        .disable_cleanup(true)
+        .make_in(directory_path, |path| {
+            openat(
+                &directory,
+                path.file_name().expect("temporary file has a name"),
+                OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+                Mode::from_raw_mode(mode as _),
+            )
+            .map(File::from)
+            .map_err(std::io::Error::from)
+        })
+        .map_err(|error| Error::file(&destination, error))?;
+    let name_temporary = temporary
+        .path()
+        .file_name()
+        .expect("temporary file has a name")
+        .to_owned();
+    let (mut file, _path) = temporary.into_parts();
     let result = (|| {
         file.write_all(bytes)
             .and_then(|()| file.sync_all())
             .map_err(|error| Error::file(&destination, error))?;
-        renameat(&directory, temporary.as_str(), &directory, name)
+        before_rename();
+        renameat(&directory, &name_temporary, &directory, name)
             .map_err(|error| Error::file(&destination, error))?;
         directory.sync_all().map_err(|error| {
             Error::file(
@@ -265,9 +364,77 @@ pub(crate) fn replace(directory_path: &Path, name: &str, bytes: &[u8], mode: u32
         })
     })();
     if result.is_err() {
-        let _ = unlinkat(&directory, temporary.as_str(), AtFlags::empty());
+        let _ = unlinkat(&directory, &name_temporary, AtFlags::empty());
     }
     result
+}
+
+#[cfg(unix)]
+fn state_temporary(name: &[u8]) -> bool {
+    let Some(stem) = name.strip_suffix(b".tmp") else {
+        return false;
+    };
+    if let Some(random) = stem.strip_prefix(b".qleisliup-state-") {
+        return random.len() == 16 && random.iter().all(u8::is_ascii_alphanumeric);
+    }
+    // Reclaim the exact pre-0.1.2 PID/counter namespace as well, without
+    // interpreting arbitrary dotfiles or noncanonical decimal spellings.
+    let Some(legacy) = stem
+        .strip_prefix(b".qleisliup-")
+        .and_then(|n| std::str::from_utf8(n).ok())
+    else {
+        return false;
+    };
+    let Some((pid, counter)) = legacy.split_once('-') else {
+        return false;
+    };
+    pid.parse::<u32>()
+        .is_ok_and(|n| n != 0 && n.to_string() == pid)
+        && counter
+            .parse::<u64>()
+            .is_ok_and(|n| n.to_string() == counter)
+}
+
+// Requires the caller's mutation lock. Inspect a bounded directory before any
+// deletion; never follow links, recurse, or remove committed state filenames.
+#[cfg(unix)]
+pub(crate) fn reclaim_state_temporaries(directory: &File, path: &Path) -> Result<()> {
+    use rustix::fs::{AtFlags, Dir, FileType, statat, unlinkat};
+    let mut names = Vec::new();
+    for (count, entry) in Dir::read_from(directory)
+        .map_err(|e| Error::file(path, e))?
+        .enumerate()
+    {
+        if count >= 4096 {
+            return Err(Error::file(
+                path,
+                "state temporary cleanup parent entry limit exceeded",
+            ));
+        }
+        let entry = entry.map_err(|e| Error::file(path, e))?;
+        if state_temporary(entry.file_name().to_bytes()) {
+            names.push(entry.file_name().to_owned());
+        }
+    }
+    names.sort();
+    names.truncate(32);
+    for name in &names {
+        let stat =
+            statat(directory, name, AtFlags::SYMLINK_NOFOLLOW).map_err(|e| Error::file(path, e))?;
+        if FileType::from_raw_mode(stat.st_mode) != FileType::RegularFile {
+            return Err(Error::file(
+                path,
+                "state temporary cleanup rejects symlinks and special files",
+            ));
+        }
+    }
+    for name in &names {
+        unlinkat(directory, name, AtFlags::empty()).map_err(|e| Error::file(path, e))?;
+    }
+    if !names.is_empty() {
+        directory.sync_all().map_err(|e| Error::file(path, e))?;
+    }
+    Ok(())
 }
 
 #[cfg(not(unix))]
@@ -277,3 +444,6 @@ pub(crate) fn replace(path: &Path, _name: &str, _bytes: &[u8], _mode: u32) -> Re
         "atomic state mutation requires a supported Unix host",
     ))
 }
+
+#[cfg(all(test, unix))]
+mod tests;

@@ -103,10 +103,7 @@ async fn transaction<T: Transport + Clone + 'static>(
     files::create_directory(&parent)?;
     let transactions = parent.join(".transactions");
     files::create_directory(&transactions)?;
-    let work = tempfile::Builder::new()
-        .prefix("install-")
-        .tempdir_in(&transactions)
-        .map_err(|e| Error::file(&transactions, e))?;
+    let work = files::temporary_directory(&transactions, "install-")?;
     let version = match selector {
         Selector::Release(version) => version.clone(),
         Selector::Stable => {
@@ -285,10 +282,7 @@ pub(crate) fn uninstall(home: &Home, version: &ExactVersion, host: &str) -> Resu
     let parent = home.path.join("toolchains");
     let transactions = parent.join(".transactions");
     files::create_directory(&transactions)?;
-    let trash = tempfile::Builder::new()
-        .prefix("uninstall-")
-        .tempdir_in(&transactions)
-        .map_err(|e| Error::file(&transactions, e))?;
+    let trash = files::temporary_directory(&transactions, "uninstall-")?;
     let root = parent.join(format!("{version}-{host}"));
     publish(&root, &trash.path().join("removed"))?;
     files::sync_directory(&parent).map_err(|e| {

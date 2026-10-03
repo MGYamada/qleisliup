@@ -34,10 +34,11 @@ mod unix {
                 OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
                 Mode::empty(),
             ) {
-                Ok(fd) => Ok(Some(Self {
-                    file: File::from(fd),
-                    path,
-                })),
+                Ok(fd) => {
+                    let file = File::from(fd);
+                    files::check_managed_directory(&file, &path)?;
+                    Ok(Some(Self { file, path }))
+                }
                 Err(rustix::io::Errno::NOENT) => Ok(None),
                 Err(e) => Err(Error::file(
                     &path,
@@ -59,11 +60,6 @@ mod unix {
         }
     }
 
-    fn generated(name: &[u8], prefix: &[u8]) -> bool {
-        name.strip_prefix(prefix)
-            .is_some_and(|suffix| suffix.len() == 6 && suffix.iter().all(u8::is_ascii_alphanumeric))
-    }
-
     fn reclaim(
         parent: &Directory,
         prefixes: &[&[u8]],
@@ -83,7 +79,7 @@ mod unix {
             let name = entry.file_name();
             if prefixes
                 .iter()
-                .any(|prefix| generated(name.to_bytes(), prefix))
+                .any(|prefix| files::generated_name(name.to_bytes(), prefix))
             {
                 names.push(name.to_owned());
             }
@@ -269,6 +265,7 @@ mod unix {
     }
 
     pub(super) fn metadata_generations(state: &Path) -> Result<()> {
+        files::managed_directory(state)?;
         let mut remaining = MAX_TREES;
         generations(
             &Directory {
@@ -284,11 +281,14 @@ mod unix {
             file: files::open_directory(&home.path)?,
             path: home.path.clone(),
         };
+        files::check_managed_directory(&root.file, &root.path)?;
+        files::reclaim_state_temporaries(&root.file, &root.path)?;
         let mut remaining = MAX_TREES;
         // Validate the committed pointer before deleting any metadata generations.
         if let Some(metadata) = root.child(c"metadata")? {
             if let Some(state) = metadata.child(c"official")? {
                 generations(&state, &mut remaining)?;
+                files::reclaim_state_temporaries(&state.file, &state.path)?;
                 reclaim(&state, &[b"work-"], None, false, &mut remaining)?;
             }
         }
@@ -305,6 +305,7 @@ mod unix {
         }
         reclaim(&root, &[b".qleisliup-manager-"], None, true, &mut remaining)?;
         if let Some(bin) = root.child(c"bin")? {
+            files::reclaim_state_temporaries(&bin.file, &bin.path)?;
             reclaim(&bin, &[b".qleisliup-manager-"], None, false, &mut remaining)?;
         }
         Ok(())

@@ -101,7 +101,7 @@ impl Manifest {
         };
         let bytes = serde_json::to_vec_pretty(&receipt)
             .map_err(|error| Error::operational(error.to_string()))?;
-        files::replace(root, RECEIPT, &bytes, 0o600)
+        files::replace_staged(root, RECEIPT, &bytes, 0o600)
     }
 }
 
@@ -154,7 +154,7 @@ impl Toolchain {
     ) -> Result<Self> {
         let name = format!("{version}-{host}");
         let root = home.path.join("toolchains").join(&name);
-        files::directory(&home.path.join("toolchains"))?;
+        files::managed_directory(&home.path.join("toolchains"))?;
         Self::release_at(&root, version, host, identities)
     }
 
@@ -165,7 +165,7 @@ impl Toolchain {
         identities: &BTreeMap<String, ArtifactIdentity>,
     ) -> Result<Self> {
         let name = format!("{version}-{host}");
-        files::directory(root)?;
+        files::managed_directory(root)?;
         let manifest_path = root.join("toolchain.json");
         let manifest: Manifest = required_json(&manifest_path)?;
         manifest.validate(&manifest_path, host)?;
@@ -205,7 +205,7 @@ impl Toolchain {
                 "receipt differs from the remembered release identity (or identity is missing)",
             ));
         }
-        files::directory(&root.join("bin"))?;
+        files::managed_directory(&root.join("bin"))?;
         for tool in TOOLS {
             files::regular(&root.join("bin").join(tool), true)?;
         }
@@ -213,9 +213,9 @@ impl Toolchain {
             files::regular(&root.join(file), false)?;
         }
         if manifest.std_kind == StdKind::Directory {
-            files::directory(&root.join("std"))?;
+            files::managed_directory(&root.join("std"))?;
         }
-        validate_external(root, &manifest)?;
+        validate_external(root, &manifest, false)?;
         Ok(Self {
             name: version.to_string(),
             root: root
@@ -252,7 +252,7 @@ impl Toolchain {
             if manifest.std_kind == StdKind::Directory {
                 files::directory(&root.join("std"))?;
             }
-            validate_external(root, manifest)?;
+            validate_external(root, manifest, true)?;
         }
         Ok(Self {
             name: name.to_owned(),
@@ -271,7 +271,11 @@ impl Toolchain {
             )));
         }
         let path = self.root.join("bin").join(tool);
-        files::directory(&self.root.join("bin"))?;
+        if self.linked {
+            files::directory(&self.root.join("bin"))?;
+        } else {
+            files::managed_directory(&self.root.join("bin"))?;
+        }
         files::regular(&path, true)?;
         files::not_manager(&path)?;
         path.canonicalize()
@@ -279,14 +283,18 @@ impl Toolchain {
     }
 }
 
-fn validate_external(root: &Path, manifest: &Manifest) -> Result<()> {
+fn validate_external(root: &Path, manifest: &Manifest, linked: bool) -> Result<()> {
     if let Verifier::External { path, .. } = &manifest.verifier {
         let relative = relative_path(path)?;
         let mut parent = root.to_path_buf();
         if let Some(directories) = relative.parent() {
             for component in directories.components() {
                 parent.push(component);
-                files::directory(&parent)?;
+                if linked {
+                    files::directory(&parent)?;
+                } else {
+                    files::managed_directory(&parent)?;
+                }
             }
         }
         files::regular(&root.join(relative), true)?;

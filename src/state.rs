@@ -42,7 +42,18 @@ impl Home {
         files::Lock::home(&self.path)
     }
 
+    // Inspection remains read-only and accepts an absent home, but never trusts
+    // state through an existing shared-writable or symlink home.
+    fn validate(&self) -> Result<()> {
+        match std::fs::symlink_metadata(&self.path) {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(Error::file(&self.path, e)),
+            Ok(_) => files::managed_directory(&self.path),
+        }
+    }
+
     pub(crate) fn settings(&self) -> Result<Settings> {
+        self.validate()?;
         let path = self.path.join("settings.json");
         let settings = read_json::<Settings>(&path)?.unwrap_or(Settings {
             schema: 1,
@@ -56,6 +67,7 @@ impl Home {
     }
 
     pub(crate) fn links(&self) -> Result<BTreeMap<String, PathBuf>> {
+        self.validate()?;
         let path = self.path.join("links.json");
         let links = read_json::<Links>(&path)?.unwrap_or(Links {
             schema: 1,
@@ -78,6 +90,7 @@ impl Home {
     }
 
     fn identity_record(&self) -> Result<Identities> {
+        self.validate()?;
         let path = self.path.join("identities.json");
         let identities = read_json::<Identities>(&path)?.unwrap_or(Identities {
             schema: 1,
@@ -149,6 +162,7 @@ impl Home {
     }
 
     fn channels(&self) -> Result<Channels> {
+        self.validate()?;
         let path = self.path.join("channels.json");
         let record = read_json::<Channels>(&path)
             .map_err(|error| {

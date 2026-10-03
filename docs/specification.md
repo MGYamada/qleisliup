@@ -1,4 +1,4 @@
-# qleisliup 0.1.1 specification
+# qleisliup 0.1.2 specification
 
 ## Status and responsibility
 
@@ -8,7 +8,7 @@ links, Unix proxies, TUF authentication, transactional installation/removal,
 bootstrap, and manager self-update.**
 Production distribution endpoints and the initial trusted root are unconfigured;
 new installs, bootstrap, and manager refreshes fail closed.
-Version 0.1.1 provides a crates.io source package containing both executables;
+Version 0.1.2 contains both executables in one crates.io source package.
 Cargo installation does not create proxies or bootstrap ownership. Registry
 publication does not configure or authenticate production toolchain distribution.
 Examples describe formats and
@@ -28,9 +28,10 @@ or certify compiler transformations, verifier correctness, or mathematical proof
 | qrate | Qleisli package unit |
 
 The end-user distribution goal is native bootstrap and prebuilt toolchains on
-a machine without Rust, Cargo, a C/C++ compiler, or CMake. Cargo is permitted
-in maintainer builds and optional source installations, never as a subprocess
-of manager installation, selection, proxy execution, or update. A crates.io
+a machine without Rust, Cargo, Lean, Lake, Python, a C/C++ compiler, or CMake.
+Cargo is permitted in maintainer builds and optional source installations,
+never as a subprocess of manager installation, selection, proxy execution,
+or update. A crates.io
 release is an additional source distribution channel, not completion of this
 goal. The [Cargo-free installation plan](cargo-free-installation.md) tracks the
 remaining native artifact and production trust work separately from implemented
@@ -50,6 +51,29 @@ Initial distribution hosts are `aarch64-apple-darwin`, `x86_64-apple-darwin`, an
 `x86_64-unknown-linux-musl`. Linux x86_64 selects the static musl distribution;
 it does not select an archive from the Rust compiler's build target alone.
 Windows and Linux ARM64 are deferred.
+
+## Host environment boundary
+
+The native distribution resolves Rust and Lean implementation dependencies at
+build time. A supported Lean kernel includes its required non-system runtime
+libraries and data; its use must not install Lean/Mathlib or rebuild proofs.
+Its declared verification arrangement remains truthful, and bundling it does
+not transfer acceptance authority or establish mathematical correctness.
+
+Python connections are separate wheel/PyPI distributions used in project-local
+environments. Their interpreters, wheels, and dependency locks are outside the
+manager's TUF authentication and lifecycle. Official samples will fix Python,
+wheel, and dependency identities, prepare them explicitly with uv, and pass the
+absolute compiler from offline `which qleisli` to the existing upstream Python
+interface. Actual compatible bundles and Python sample/CI delivery remain
+upstream acceptance work, not implemented manager features.
+
+qleisliup adds no Rust/Lean/Python installer, package resolver, language proxy,
+cross-language lockfile, or qargo integration library. Selected tools retain
+their own contracts; the proxy does not sandbox arbitrary local toolchains or
+rewrite their environment beyond the documented selection/PATH propagation.
+See [environment dependencies](environment-dependencies.md) for the adopted
+build/runtime separation, fixed Python workflow, and acceptance requirements.
 
 ## Current executable
 
@@ -290,6 +314,19 @@ reads require regular files, reject symlinks/special files, and are bounded to
 1 MiB per file. State is read only when an operation needs it; a higher-priority
 selection does not fail because an unused lower-priority setting is malformed.
 
+On Unix, newly created manager-owned home, state, staging, and missing home
+ancestor directories request mode 0700; the umask can only remove permissions.
+Staging creation explicitly requests this mode rather than relying on allocator
+defaults. Published archive directories are normalized to 0755. Existing owned
+directories (including state/generation/transaction parents, bootstrap/update
+parents, and installed release directories used for selection) must be real and
+have no group/world write bits. Reject unsafe permissions without chmod or
+silently trusting their contents. Non-writable 0750/0755 directories remain
+compatible. Home validation also applies to offline state inspection. This Unix
+mode-bit policy assumes the user's chosen ancestors and filesystem access
+controls are trusted; it does not change arbitrary existing ancestors, project
+pin directories, or unauthenticated linked toolchains.
+
 State updates use an exclusive temporary file in the destination directory,
 sync the file, atomically replace the destination, and sync the directory.
 New home/directory entries and their parent inodes are also synced before relying
@@ -299,6 +336,11 @@ Pin writes the complete supported declaration with mode 0644; settings/links use
 subject to the process umask. Pin replaces comments/formatting rather than
 merging unsupported settings. A failure after rename but during directory sync
 reports that replacement occurred and durability was not confirmed.
+Temporary names are `.qleisliup-state-<16 ASCII alphanumeric characters>.tmp`,
+allocated with exclusive creation and collision retries. Before creating one,
+reclaim a bounded batch of abandoned state temporaries in that directory while
+holding the mutation lock (and the project-directory lock for pins), as specified
+below. A killed writer leaves the previous committed record intact until rename.
 
 Mutating commands share a process-scoped advisory lock at `.mutation-lock`;
 All mutations serialize through this lock. Pin additionally locks its destination
@@ -381,7 +423,9 @@ role bytes are fetched and verified on every load; their version floors remain
 in the persisted signed snapshot. Do not accumulate superseded numbered delegated
 cache files across refreshes. Sync files/directories, then atomically switch
 `current.json`. The pointer is
-`{"schema":1,"generation":"state-<generated name>"}`. Restart from that generation's
+`{"schema":1,"generation":"state-<generated name>"}`. Accept the generation name
+only when its suffix is exactly six ASCII alphanumeric characters, the same
+canonical namespace used by the allocator and cleanup. Restart from that generation's
 root, never from an older initial root. Corrupt persisted records fail rather
 than allowing tough to ignore malformed optional cached JSON. Once the pointer
 is durable, old committed generations can be removed. A killed process may leave
@@ -499,7 +543,7 @@ toolchain contents, but cannot enforce immutability against the filesystem owner
 Install/sync that require a transaction, uninstall, bootstrap, and self-update
 reclaim abandoned private trees after acquiring the home mutation lock and before
 creating their own staging. The existing exact-install fast path, selection,
-default/pin writes, local links, inspection, and proxy execution do not run cleanup.
+default/pin writes, local links, inspection, and proxy execution do not run tree cleanup.
 Metadata checkpoints also reclaim unreferenced generations after publishing the
 new durable pointer; the current transaction's work directory remains live.
 
@@ -533,6 +577,22 @@ explicitly reports that the checkpoint was published. Cleanup neither repairs
 committed state nor discards authentication or rollback history, and does not
 authenticate local bytes. Like the rest of the home state, it assumes cooperating
 processes obey the lock; it is not a boundary against the filesystem owner.
+
+Atomic state-file cleanup is separate from tree reclamation. Before a state
+write, scan at most 4,096 destination-directory entries and remove at most 32
+reserved temporary files. Lifecycle cleanup also checks home,
+`metadata/official`, and owned `bin` for these files. Accept only
+`.qleisliup-state-<16 ASCII alphanumeric characters>.tmp` and the legacy
+`.qleisliup-<PID>-<counter>.tmp` namespace (canonical decimal nonzero u32 PID and
+u64 counter, with no leading zeroes). Unrelated files and committed records are
+untouched. Open/inspect/delete relative to the directory descriptor, reject
+matching symlinks or special entries before deleting the batch, and sync after
+removal. Remaining files wait for a later write/pass; exceeding the scan bound
+fails rather than performing unbounded work. State writes remain serialized,
+so live cooperating writers' temporary files are never reclaimed. Inspection,
+proxies, and reuse of an installed exact release remain free of cleanup writes.
+Writing the receipt in a freshly staged bundle does not scan its payload for
+state temporaries: authenticated bundle files may legitimately use those names.
 
 ## Bootstrap and self-update
 
