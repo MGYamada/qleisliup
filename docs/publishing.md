@@ -1,7 +1,7 @@
 # Publishing the source package
 
-Version 0.1.1 is prepared for crates.io publication. This document describes
-preflight checks; it does not record or authorize a registry upload. Production
+Version 0.1.1 provides a crates.io source package. This document describes
+the release procedure; it does not itself authorize a registry upload. Production
 Qleisli distribution, manager artifacts, endpoints, and trust roots remain a
 separate task. See the [implementation plan](implementation-plan.md).
 

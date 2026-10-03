@@ -42,6 +42,7 @@ Only install/sync, bootstrap, and self update may refresh/download.
 Existing exact toolchain installs are reused offline.
 sync uses the nearest repository declaration, ignoring selection overrides.
 default stable stores an installed exact version and never follows later updates.
+Lifecycle mutations reclaim bounded stale private staging under the home lock.
 
 Self update requires a bootstrap-owned manager; external installations are refused.
 
@@ -176,8 +177,8 @@ pub(crate) fn run(args: &[OsString]) -> Result<()> {
         }
         Command::Default(Selector::Stable) => {
             let home = Home::from_environment()?;
-            let version = home.stable()?;
-            selection::set_default(&home, &version, current_host()?)?;
+            let version =
+                selection::set_default_selector(&home, &Selector::Stable, current_host()?)?;
             format!("global default: {version}\n")
         }
         Command::Default(Selector::Linked(_)) => {

@@ -76,6 +76,7 @@ pub(crate) fn run<T: Transport + Clone + 'static>(
     }
     home.identities()?;
     let _lock = home.lock()?;
+    crate::cleanup::stale(home, &_lock)?;
     if let Selector::Release(version) = selector {
         if existing(home, version, host)? {
             return Ok(version.clone());
@@ -269,6 +270,7 @@ pub(crate) fn publish(_: &Path, _: &Path) -> Result<()> {
 pub(crate) fn uninstall(home: &Home, version: &ExactVersion, host: &str) -> Result<()> {
     home.identities()?;
     let _lock = home.lock()?;
+    crate::cleanup::stale(home, &_lock)?;
     if matches!(home.settings()?.default, DefaultValue::Version(value) if value == version.to_string())
     {
         return Err(Error::operational(

@@ -2,7 +2,7 @@
 
 Product versions are independent of distribution and state schema versions.
 
-## 0.1.1 - Unreleased
+## 0.1.1 - 2026-10-03
 
 - Prepare crates.io publication with package keywords, categories, documentation
   metadata, and a crates.io-only publication setting.
@@ -17,6 +17,13 @@ Product versions are independent of distribution and state schema versions.
   end-user goal; document the remaining artifact, trust, and clean-host work.
 - Add native release candidate builds to CI and a restricted-PATH runtime smoke
   check that rejects invocation of Rust developer tools during local operations.
+- Normalize authenticated archive executables to mode 0755 and data files to
+  0644; retain rejection of privileged modes and missing executable bits (#2).
+- Resolve `default stable` again under the home mutation lock before validating
+  and saving its exact version, avoiding a concurrent channel-update race (#3).
+- Reclaim bounded abandoned install/removal, metadata, bootstrap, and update
+  staging under the home lock, preserving committed state and rejecting unsafe
+  filesystem substitutions (#4).
 
 ## 0.1.0 - 2026-10-03
 

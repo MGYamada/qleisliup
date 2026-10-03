@@ -585,7 +585,18 @@ fn killed_update_retains_old_manager_and_retries_with_persisted_identity() {
     child.kill().unwrap();
     child.wait().unwrap();
     assert!(ready, "manager child did not reach durable identity");
-    // Abandoned private staging is permitted; final manager/proxies remain old.
+    // Private staging survives the kill; the following mutation must reclaim it.
+    let abandoned: Vec<_> = fs::read_dir(fixture.home.path.join("bin"))
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| {
+            p.file_name()
+                .unwrap()
+                .to_string_lossy()
+                .starts_with(".qleisliup-manager-")
+        })
+        .collect();
+    assert!(!abandoned.is_empty());
     assert_eq!(
         fs::read(manager_path(&fixture)).unwrap(),
         before["qleisliup"]
@@ -598,6 +609,7 @@ fn killed_update_retains_old_manager_and_retries_with_persisted_identity() {
     }
     assert_eq!(fixture.home.manager_identities().unwrap().len(), 2);
     apply(&fixture, update_mode(&fixture, "0.1.0")).unwrap();
+    assert!(abandoned.iter().all(|path| !path.exists()));
     assert_eq!(
         fs::read(manager_path(&fixture)).unwrap(),
         native("0.2.0", "valid")
