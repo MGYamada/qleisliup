@@ -620,7 +620,7 @@ fn tool_help_version_and_non_utf8_first_arguments_are_forwarded() {
             .unwrap();
         passed(&output);
         field(&output, "arg", OsStr::new(flag));
-        assert!(!text(&output).contains("qleisliup 0.1.0"));
+        assert!(!text(&output).contains(concat!("qleisliup ", env!("CARGO_PKG_VERSION"))));
     }
     let raw = OsString::from_vec(vec![0xff, b'+']);
     let output = fixture
