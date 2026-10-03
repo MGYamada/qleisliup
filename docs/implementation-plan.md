@@ -384,7 +384,8 @@ Linux/macOS x86_64 and remote CI execution remain unperformed locally. Actual
 production URLs/root, bootstrap download authenticity, signing/rotation ceremony,
 real host CPU/linkage compatibility, mount-point execution, power-loss/storage
 fault testing, and independent security review remain separate release gates.
-Killed processes can leave private staging; automatic cleanup is deferred.
+At this checkpoint, killed processes could leave private staging and automatic
+cleanup was deferred. The subsequent issue fixes implement bounded reclamation.
 No sibling checkout, release/tag/key ceremony, distribution publication, or
 registry publication was changed.
 
@@ -422,6 +423,34 @@ unperformed locally. Process-group cleanup covers inherited helpers and is not
 a sandbox for authenticated code intentionally creating a different group or
 session. Production trust/endpoints remain unconfigured; no sibling repository
 or publication operation was changed.
+
+### Lifecycle issue validation, 2026-10-03
+
+Issues #2–#4 are addressed by canonical archive file permissions, stable-default
+resolution inside the mutation critical section, and bounded reclamation of
+abandoned private staging. The permission and stable-default regressions were
+reproduced before correction. Existing killed-install and killed-update tests now
+require the next mutation to reclaim the abandoned trees while preserving retry
+behavior. Additional cases cover all reserved staging locations, committed-state
+preservation, active-generation case aliases, a 32-tree pass limit, invalid
+pointers, and symlink/special-file substitutions, including bootstrap proxy links.
+
+Checks ran on macOS ARM64 against the unchanged locked dependency graph:
+
+| Compiler | Build, both binaries | Tests | Formatting | Clippy, warnings denied | CLI smoke, both binaries |
+| --- | --- | --- | --- | --- | --- |
+| Rust 1.85.0 | Passed | 145 passed | Passed | Passed | Passed |
+| Rust 1.98.1, installed Homebrew stable release | Passed | 145 passed | Passed | Passed | Passed |
+
+There are 94 named cases: 51 shared unit cases, 23 selection/CLI cases, 17
+link/process cases, and 3 public lifecycle CLI cases. Both binary harnesses run
+the shared unit suite. Formatting includes both standalone native fixtures.
+The Unix-socket substitution test required running tests outside the local
+execution sandbox. Shell syntax, tracked whitespace, and unchanged Cargo.lock
+were also checked. Linux/macOS x86_64 execution, filesystem mount boundaries,
+power-loss/storage faults, live production distribution, and independent security
+review remain separate acceptance scenarios. Production endpoints and trust
+remain unconfigured.
 
 ## Production prerequisites and release boundary
 

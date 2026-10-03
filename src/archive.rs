@@ -138,7 +138,9 @@ pub(crate) fn extract(
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
-                file.set_permissions(fs::Permissions::from_mode(mode))
+                // Archive execute bits describe intent, not owner/group policy.
+                let normalized = if mode & 0o111 != 0 { 0o755 } else { 0o644 };
+                file.set_permissions(fs::Permissions::from_mode(normalized))
                     .map_err(|e| Error::file(&destination, e))?;
             }
             file.sync_all().map_err(|e| Error::file(&destination, e))?;

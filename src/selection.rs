@@ -110,16 +110,49 @@ pub(crate) fn resolve(home: &Home, request: &Request, host: &str) -> Result<Tool
 }
 
 pub(crate) fn set_default(home: &Home, version: &ExactVersion, host: &str) -> Result<()> {
+    set_default_selector(home, &Selector::Release(version.clone()), host).map(|_| ())
+}
+
+pub(crate) fn set_default_selector(
+    home: &Home,
+    selector: &Selector,
+    host: &str,
+) -> Result<ExactVersion> {
+    set_default_with(home, selector, host, || {})
+}
+
+pub(crate) fn set_default_with(
+    home: &Home,
+    selector: &Selector,
+    host: &str,
+    before_lock: impl FnOnce(),
+) -> Result<ExactVersion> {
+    let version = default_version(home, selector)?;
     let selected = Request {
         selector: Selector::Release(version.clone()),
         source: Source::CommandLine,
     };
     resolve(home, &selected, host)?;
     home.settings()?;
+    before_lock();
     let _lock = home.lock()?;
     home.settings()?;
+    let version = default_version(home, selector)?;
+    let selected = Request {
+        selector: Selector::Release(version.clone()),
+        source: Source::CommandLine,
+    };
     resolve(home, &selected, host)?;
-    home.save_default(version)
+    home.save_default(&version)?;
+    Ok(version)
+}
+
+fn default_version(home: &Home, selector: &Selector) -> Result<ExactVersion> {
+    match selector {
+        Selector::Release(version) => Ok(version.clone()),
+        Selector::Stable => home.stable(),
+        Selector::Linked(_) => Err(Error::usage("default accepts an exact version or stable")),
+    }
 }
 
 pub(crate) fn list(home: &Home) -> Result<String> {
