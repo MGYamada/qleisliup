@@ -101,6 +101,160 @@ fn contents(path: &Path) -> BTreeMap<String, Vec<u8>> {
         .collect()
 }
 
+fn assert_owned_permissions(path: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+    let metadata = fs::symlink_metadata(path).unwrap();
+    if !metadata.is_dir() {
+        return;
+    }
+    let mode = metadata.permissions().mode() & 0o777;
+    assert_eq!(
+        mode & 0o022,
+        0,
+        "shared-writable owned directory: {}",
+        path.display()
+    );
+    let name = path.file_name().unwrap().as_encoded_bytes();
+    if [
+        b"work-".as_slice(),
+        b"state-",
+        b"install-",
+        b"uninstall-",
+        b".qleisliup-manager-",
+    ]
+    .iter()
+    .any(|prefix| files::generated_name(name, prefix))
+    {
+        assert_eq!(
+            mode,
+            0o700,
+            "non-private staging directory: {}",
+            path.display()
+        );
+    }
+    for entry in fs::read_dir(path).unwrap() {
+        assert_owned_permissions(&entry.unwrap().path());
+    }
+}
+
+#[test]
+fn permissive_umask_lifecycle_child() {
+    use std::os::unix::fs::PermissionsExt;
+    if std::env::var_os("QLEISLIUP_UNIT_UMASK").is_none() {
+        return;
+    }
+    let mut fixture = Fixture::new();
+    fixture.home.path = fixture.home.path.parent().unwrap().join("new-parent/home");
+    run(
+        &fixture.home,
+        &Selector::parse("stable").unwrap(),
+        HOST,
+        fixture.source(),
+        &|_| {
+            assert_owned_permissions(&fixture.home.path);
+            Ok(())
+        },
+    )
+    .unwrap();
+    for relative in [
+        "",
+        "metadata",
+        "metadata/official",
+        "metadata/official/generations",
+        "toolchains",
+        "toolchains/.transactions",
+    ] {
+        assert_eq!(
+            fs::metadata(fixture.home.path.join(relative))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o700
+        );
+    }
+    assert_eq!(
+        fs::metadata(fixture.home.path.parent().unwrap())
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777,
+        0o700
+    );
+    refresh(&mut fixture, "0.1.0", 2);
+    lifecycle::run(
+        &fixture.home,
+        host(),
+        Mode::Bootstrap,
+        fixture.source(),
+        &|_| {
+            assert_owned_permissions(&fixture.home.path);
+            Ok(())
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        fs::metadata(fixture.home.path.join("bin"))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777,
+        0o700
+    );
+    refresh(&mut fixture, "0.2.0", 3);
+    lifecycle::run(
+        &fixture.home,
+        host(),
+        update_mode(&fixture, "0.1.0"),
+        fixture.source(),
+        &|_| {
+            assert_owned_permissions(&fixture.home.path);
+            Ok(())
+        },
+    )
+    .unwrap();
+    crate::install::uninstall(&fixture.home, &ExactVersion::parse("0.4.0").unwrap(), HOST).unwrap();
+    assert_owned_permissions(&fixture.home.path);
+}
+
+#[test]
+fn lifecycle_stays_private_with_permissive_umask() {
+    // Set umask only in an isolated shell child, never in the threaded harness.
+    let output = Command::new("/bin/sh")
+        .args(["-c", "umask 000; exec \"$@\"", "sh"])
+        .arg(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "install::tests::manager::permissive_umask_lifecycle_child",
+            "--nocapture",
+        ])
+        .env("QLEISLIUP_UNIT_UMASK", "1")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn self_update_rejects_shared_writable_owned_bin_before_network_access() {
+    use std::os::unix::fs::PermissionsExt;
+    let fixture = bootstrapped();
+    let bin = fixture.home.path.join("bin");
+    let before = contents(&bin);
+    fs::set_permissions(&bin, fs::Permissions::from_mode(0o777)).unwrap();
+    fixture.requests.store(0, Ordering::SeqCst);
+    rejected(
+        apply(&fixture, update_mode(&fixture, "0.1.0")),
+        "must not be group- or world-writable",
+    );
+    assert_eq!(fixture.requests.load(Ordering::SeqCst), 0);
+    assert_eq!(contents(&bin), before);
+}
+
 #[test]
 fn bootstrap_publishes_a_complete_manager_and_six_relative_proxies_only() {
     let mut fixture = Fixture::new();

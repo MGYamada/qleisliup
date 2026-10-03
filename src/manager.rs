@@ -178,8 +178,10 @@ fn owned(
         )
     };
     files::directory(&home.path).map_err(|_| rejected())?;
+    files::managed_directory(&home.path)?;
     let bin = home.path.join("bin");
     files::directory(&bin).map_err(|_| rejected())?;
+    files::managed_directory(&bin)?;
     let path = bin.join("qleisliup");
     // Compare actual paths while accepting invocation aliases of this manager.
     // The one-link and digest checks still reject external or stale executables.
@@ -234,10 +236,7 @@ async fn transaction<T: Transport + Clone + 'static>(
         Mode::Bootstrap => home.path.clone(),
         Mode::Update { .. } => home.path.join("bin"),
     };
-    let work = tempfile::Builder::new()
-        .prefix(".qleisliup-manager-")
-        .tempdir_in(&parent)
-        .map_err(|e| Error::file(&parent, e))?;
+    let work = files::temporary_directory(&parent, ".qleisliup-manager-")?;
     let channel_info = client.info("channels/qleisliup-stable.json", distribution::SMALL_TARGET)?;
     let channel_path = work.path().join("channel.json");
     client.download(&channel_info, &channel_path).await?;

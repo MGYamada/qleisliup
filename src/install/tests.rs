@@ -19,6 +19,7 @@ const HOST: &str = "aarch64-apple-darwin";
 const FUTURE: &str = "2100-01-01T00:00:00Z";
 const PAST: &str = "2000-01-01T00:00:00Z";
 
+mod hardening;
 mod manager;
 
 fn digest(bytes: &[u8]) -> String {

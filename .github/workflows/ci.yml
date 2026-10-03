@@ -57,8 +57,10 @@ jobs:
         run: sh scripts/check_cli.sh 'target/${{ matrix.target }}/debug/qleisliup'
       - name: Build native manager candidates
         run: cargo +${{ matrix.toolchain }} build --release --frozen --bins --target '${{ matrix.target }}'
-      - name: Check native operation without Rust developer tools
-        run: sh scripts/check_cargo_free.sh 'target/${{ matrix.target }}/release/qleisliup'
+      - name: Check native operation without Rust, Lean, Python, or build tools
+        run: |
+          sh scripts/check_runtime_guard.sh
+          sh scripts/check_cargo_free.sh 'target/${{ matrix.target }}/release/qleisliup'
       - name: Verify the crates.io source package
         run: cargo +${{ matrix.toolchain }} package --locked --target '${{ matrix.target }}'
       - name: Check tracked whitespace and lockfile stability

@@ -163,7 +163,7 @@ pub(crate) fn list(home: &Home) -> Result<String> {
     let directory = home.path.join("toolchains");
     let directories = match fs::read_dir(&directory) {
         Ok(directories) => {
-            crate::files::directory(&directory)?;
+            crate::files::managed_directory(&directory)?;
             Some(directories)
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
@@ -178,7 +178,7 @@ pub(crate) fn list(home: &Home) -> Result<String> {
                 .to_str()
                 .ok_or_else(|| Error::file(&entry.path(), "release directory name is not UTF-8"))?;
             if name == ".transactions" {
-                crate::files::directory(&entry.path())?;
+                crate::files::managed_directory(&entry.path())?;
                 continue;
             }
             let (version, host) = release_directory(name)?;

@@ -11,9 +11,15 @@ tool and an optional way to install the manager from source. This end-user
 distribution path is **not available yet**; see the
 [Cargo-free installation plan](docs/cargo-free-installation.md).
 
+The native distribution goal also excludes a user-installed Lean or Python
+environment. Rust and supported Lean kernels are built by the distributor;
+Python connections use separately distributed wheels and project-local uv
+environments. See the [environment boundary](docs/environment-dependencies.md)
+for ownership, exact dependency records, and pending upstream acceptance work.
+
 ## Current status
 
-Version **0.1.1** implements **Stages 1–4: offline selection, local links,
+Version **0.1.2** implements **Stages 1–4: offline selection, local links,
 Unix proxies, TUF authentication, transactional toolchain installation,
 bootstrap, and manager self-update**.
 The manager supports help/version, `list`, `show`, `which`, `default`, `pin`,
@@ -26,8 +32,9 @@ without arguments prints help.
 New installs, bootstrap, and updates fail closed with exit status 1. Test repositories and keys are
 internal to the test harness; the CLI has no trust or endpoint override.
 Already installed exact releases can be reused offline. Externally installed
-managers refuse self-replacement. Version 0.1.1 is a source release for
-crates.io and GitHub. Production toolchain
+managers refuse self-replacement. Version 0.1.2 is prepared as a source release;
+it has not been published by this version update. Version 0.1.1 remains the
+published source release for crates.io and GitHub. Production toolchain
 distribution and prebuilt manager artifacts are not included.
 
 Building from source requires Rust **1.85** or newer; the implementation edition
@@ -48,7 +55,7 @@ qleisliup --version
 qleisliup-init --help
 ```
 
-Install version 0.1.1 from crates.io:
+Install the published version 0.1.1 from crates.io:
 
 ```sh
 cargo install qleisliup --version 0.1.1 --locked
@@ -86,7 +93,7 @@ cargo run --frozen -- --help
 cargo run --frozen -- --version
 ```
 
-The version command prints `qleisliup 0.1.1`. Cargo.toml is the version source;
+The version command prints `qleisliup 0.1.2`. Cargo.toml is the version source;
 the manager's version is independent of Qleisli and qargo versions.
 
 ## Local selection and pinning
@@ -146,8 +153,8 @@ The initial target platforms are macOS ARM64, macOS x86_64, and Linux x86_64
 musl. Windows and Linux ARM64 are deferred. CI checks Stages 1–4 on the three
 initial platforms; it does not publish binaries.
 It also builds native release candidates and exercises local manager operations
-with Cargo, rustc, rustdoc, and rustup trapped on a restricted PATH. This does
-not establish live toolchain download or bootstrap readiness.
+with Rust, Lean, Python, and native build tools trapped on a restricted PATH.
+This does not establish live toolchain download or bootstrap readiness.
 
 ## Installation boundary
 
@@ -179,11 +186,21 @@ A receipt describes authentication at installation; it does not revalidate local
 bytes or establish mathematical correctness. Real upstream bundles and the
 production security configuration still require separate validation.
 
+New manager-owned home, state, and staging directories use mode 0700 even with
+a permissive umask. Existing owned directories must not be group- or
+world-writable; unsafe permissions fail closed and require explicit repair.
+Published bundle directories use 0755. This policy does not restrict project
+pin directories or unauthenticated local toolchain links.
+
 Lifecycle mutations reclaim bounded amounts of abandoned private staging under
 the home lock, including unreferenced metadata generations. Cleanup protects the
 committed metadata generation and rejects unexpected symlinks, special files, and
 filesystem boundaries. Offline inspection, proxies, and reuse of an existing exact
 installation do not trigger cleanup. See the [cleanup contract](docs/specification.md#stale-private-data-cleanup).
+State writes also reclaim reserved crash-left temporary files in the destination
+directory under the mutation lock. Random exclusive temporary names avoid
+collisions with a prior process's PID/counter files. TUF generation pointers use
+the same exact six-character suffix rule as generation cleanup.
 
 ## Bootstrap and manager update
 
@@ -268,9 +285,12 @@ no other toolchain, PATH executable, or implicit shell is used as fallback.
 - [Working guidelines](AGENTS.md): repository development rules.
 - [Changelog](CHANGELOG.md): changes made to this project.
 - [Publishing guide](docs/publishing.md): source package contents and preflight checks.
-- [v0.1.1 notes](docs/releases/v0.1.1.md): packaging changes and distribution status.
+- [v0.1.2 notes](docs/releases/v0.1.2.md): environment policy and runtime checks.
+- [v0.1.1 notes](docs/releases/v0.1.1.md): previous source release and lifecycle fixes.
 - [Cargo-free installation plan](docs/cargo-free-installation.md): native distribution
   work and clean-machine acceptance scenarios.
+- [Environment dependencies](docs/environment-dependencies.md): native Rust/Lean
+  distribution, separate Python environments, and explicit compiler handoff.
 
 Development checks:
 
@@ -283,6 +303,7 @@ rustfmt --edition 2024 --check tests/fixtures/manager_tool.rs
 cargo clippy --frozen --all-targets -- -D warnings
 sh scripts/check_cli.sh target/debug/qleisliup
 cargo build --release --frozen --bins
+sh scripts/check_runtime_guard.sh
 sh scripts/check_cargo_free.sh target/release/qleisliup
 cargo package --locked
 git diff --check

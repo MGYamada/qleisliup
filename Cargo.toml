@@ -1,6 +1,6 @@
 [package]
 name = "qleisliup"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 rust-version = "1.85"
 license = "Apache-2.0"
@@ -24,6 +24,8 @@ include = [
     "/tests/**",
     "/scripts/check_cli.sh",
     "/scripts/check_cargo_free.sh",
+    "/scripts/without_developer_tools.sh",
+    "/scripts/check_runtime_guard.sh",
     "/docs/**",
 ]
 

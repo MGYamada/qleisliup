@@ -1,6 +1,7 @@
 # Publishing the source package
 
-Version 0.1.1 provides a crates.io source package. This document describes
+Version 0.1.2 is prepared as a crates.io source package, not yet published by
+this version update. This document describes
 the release procedure; it does not itself authorize a registry upload. Production
 Qleisli distribution, manager artifacts, endpoints, and trust roots remain a
 separate task. See the [implementation plan](implementation-plan.md).
@@ -10,7 +11,8 @@ separate task. See the [implementation plan](implementation-plan.md).
 Cargo.toml is the product version source and restricts publication to crates.io.
 Its explicit include list contains both executable sources, Cargo.lock, README,
 CHANGELOG, Apache-2.0 LICENSE, NOTICE, working guidelines, design/release docs,
-integration tests, native fixture sources, and both CLI/runtime smoke scripts. Cargo adds
+integration tests, native fixture sources, CLI/runtime smoke scripts, and the
+reusable developer-tool guard with its negative checks. Cargo adds
 the normalized manifest, original manifest, and VCS information when available.
 CI configuration, build output, local manager state, and prebuilt binaries are
 not included. There is no public Rust library.
@@ -46,16 +48,17 @@ Do not skip package verification. For review of uncommitted preparation changes,
 Use `--offline` for a cached dry run when registry access is unavailable, and
 record that the live registry and account permissions were not checked.
 
-The archive is written to `target/package/qleisliup-0.1.1.crate`. Check that
+The archive is written to `target/package/qleisliup-0.1.2.crate`. Check that
 LICENSE, NOTICE, Cargo.lock, both executable entry points, and native fixtures
 are present. Test the extracted source as well:
 
 ```sh
-cd target/package/qleisliup-0.1.1
+cd target/package/qleisliup-0.1.2
 cargo test --frozen --all-targets
 cargo build --frozen
 sh scripts/check_cli.sh target/debug/qleisliup
 cargo build --release --frozen --bins
+sh scripts/check_runtime_guard.sh
 sh scripts/check_cargo_free.sh target/release/qleisliup
 ```
 

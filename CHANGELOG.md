@@ -2,6 +2,27 @@
 
 Product versions are independent of distribution and state schema versions.
 
+## 0.1.2 - 2026-10-03
+
+- Adopt separate Rust/Lean distribution-time dependency resolution and
+  project-local Python environments, with separate wheel/PyPI delivery, exact
+  Python locks, explicit compiler handoff, and upstream compatibility gates.
+- Extend the restricted-PATH native runtime check to Lean, Python, environment
+  managers, and native build tools; expose a reusable maintainer command guard
+  and check that swallowed tool failures still reject a scenario.
+- Include the guard and its checks in source packages and the existing six-job
+  CI matrix. Real bundles, native Lean delivery, Python compatibility CI, and
+  production trust remain separate acceptance work.
+- Create owned home/state/staging directories with mode 0700 regardless of a
+  permissive umask; reject existing group/world-writable owned directories,
+  including during offline state and release inspection (#7).
+- Randomize exclusive state-write temporary names and reclaim bounded batches
+  of crash-left current and legacy temporaries under the mutation lock, without
+  following links or touching committed records (#8).
+- Share the exact six-character ASCII alphanumeric generation-name rule between
+  TUF pointer loading, staging allocation, and stale cleanup; preserve active
+  generation protection by filesystem identity (#9).
+
 ## 0.1.1 - 2026-10-03
 
 - Update tar to 0.4.45 to address RUSTSEC-2026-0067 and RUSTSEC-2026-0068;
