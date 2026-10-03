@@ -22,6 +22,7 @@ Product versions are independent of distribution and state schema versions.
 - Share the exact six-character ASCII alphanumeric generation-name rule between
   TUF pointer loading, staging allocation, and stale cleanup; preserve active
   generation protection by filesystem identity (#9).
+- Exclude macOS Finder metadata from the explicit source package include list.
 
 ## 0.1.1 - 2026-10-03
 

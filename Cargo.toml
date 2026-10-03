@@ -27,6 +27,7 @@ include = [
     "/scripts/without_developer_tools.sh",
     "/scripts/check_runtime_guard.sh",
     "/docs/**",
+    "!**/.DS_Store",
 ]
 
 [dependencies]

@@ -673,8 +673,10 @@ There are 108 named cases: 65 shared unit cases executed by both binary
 harnesses, plus 43 integration cases. Formatting includes both standalone native
 fixtures; runtime checks include guard rejection and restricted-PATH execution.
 The Unix-socket fixture requires running the suites outside the local execution
-sandbox. Both 52-file source packages preserve the locked dependency graph and
+sandbox. Both 50-file source packages preserve the locked dependency graph and
 final Rust sources. Cargo.lock differs from 0.1.1 only in the manager's version.
+The explicit include list now excludes `.DS_Store`; the earlier package checks
+accepted two ignored Finder metadata files, which are absent from final packages.
 Shell syntax, documentation links, CI YAML/six-job matrix, and whitespace checks
 passed. Other-host execution is checked separately by CI; filesystem mount
 boundaries, power-loss/storage faults, real upstream bundles, Lean/Python
