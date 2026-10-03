@@ -26,7 +26,10 @@ agree on the product version, and that CHANGELOG records the actual changes.
 Retain historical version examples and prior release notes.
 
 Run the development checks in [README](../README.md) with Rust 1.85.0 and stable
-and inspect the supported-host CI results. Then inspect and verify the archive:
+and inspect the supported-host CI results. Audit the exact Cargo.lock with a
+current RustSec database using `cargo audit`; resolve reported vulnerabilities
+before publication and record the auditor/database versions. Then inspect and
+verify the archive:
 
 ```sh
 cargo package --list --frozen

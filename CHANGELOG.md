@@ -4,6 +4,8 @@ Product versions are independent of distribution and state schema versions.
 
 ## 0.1.1 - 2026-10-03
 
+- Update tar to 0.4.45 to address RUSTSEC-2026-0067 and RUSTSEC-2026-0068;
+  retain the manager's own bounded extraction and archive-entry restrictions.
 - Prepare crates.io publication with package keywords, categories, documentation
   metadata, and a crates.io-only publication setting.
 - Define the source package contents explicitly, including LICENSE, NOTICE,
