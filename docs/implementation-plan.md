@@ -7,8 +7,7 @@ offline selection, exact defaults/pins, local links, Unix proxies, and TUF
 transactional toolchain installation, together
 with the adopted [specification](specification.md), development files, tests,
 and CI. Production endpoints/trust remain unconfigured. The Cargo package
-version is 0.1.2, with source packaging prepared for crates.io. Registry publication
-is separate and has not been performed as part of this preparation. The package
+version is 0.1.2, with a source release for crates.io and GitHub. The package
 includes no prebuilt manager binary or available Qleisli distribution.
 
 Keep delivery in this order: **local selection → links and proxies → TUF and
@@ -620,8 +619,9 @@ key, distribution metadata, release, or registry publication was changed.
 
 Cargo.toml and the root Cargo.lock entry now identify qleisliup 0.1.2. Dependency
 versions are unchanged. Current docs and release notes use 0.1.2; historical
-validation records and the published 0.1.1 registry installation example remain
-explicitly separate. No registry upload, GitHub release, or tag was created.
+validation records and the then-published 0.1.1 registry installation example were
+kept separate at this preparation checkpoint. No registry upload, GitHub release,
+or tag was created at that checkpoint; release execution follows separately.
 
 Checks ran on macOS ARM64 with the locked graph, offline:
 
@@ -682,6 +682,20 @@ passed. Other-host execution is checked separately by CI; filesystem mount
 boundaries, power-loss/storage faults, real upstream bundles, Lean/Python
 compatibility, live distribution, and independent security review remain
 separate acceptance scenarios. Production endpoints/trust remain unconfigured.
+
+## Version 0.1.2 release preflight, 2026-10-03
+
+The user separately authorized crates.io and GitHub publication of 0.1.2.
+Current installation examples and release documentation now target that version;
+the earlier preparation-only validation checkpoints remain historical records.
+No runtime code or locked dependency version changed during this finalization.
+
+The exact Cargo.lock passed cargo-audit 0.22.2 using the current RustSec database,
+commit `ef6173cbc5c50ec8166f9a5b28f07834144373ee` (1,290 advisories): 217 dependencies,
+zero vulnerabilities, zero warnings, and no ignored advisories. Publication
+requires the final supported-host CI results, clean package/dry-run verification,
+and a matching merged source tree. The GitHub release records those results,
+the release commit, and the checksum of the published source crate.
 
 ## Production prerequisites and release boundary
 

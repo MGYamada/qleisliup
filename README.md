@@ -32,9 +32,8 @@ without arguments prints help.
 New installs, bootstrap, and updates fail closed with exit status 1. Test repositories and keys are
 internal to the test harness; the CLI has no trust or endpoint override.
 Already installed exact releases can be reused offline. Externally installed
-managers refuse self-replacement. Version 0.1.2 is prepared as a source release;
-it has not been published by this version update. Version 0.1.1 remains the
-published source release for crates.io and GitHub. Production toolchain
+managers refuse self-replacement. Version 0.1.2 is a source release for
+crates.io and GitHub. Production toolchain
 distribution and prebuilt manager artifacts are not included.
 
 Building from source requires Rust **1.85** or newer; the implementation edition
@@ -55,10 +54,10 @@ qleisliup --version
 qleisliup-init --help
 ```
 
-Install the published version 0.1.1 from crates.io:
+Install version 0.1.2 from crates.io:
 
 ```sh
-cargo install qleisliup --version 0.1.1 --locked
+cargo install qleisliup --version 0.1.2 --locked
 ```
 
 Cargo installs `qleisliup` and `qleisliup-init`. It does not install Qleisli,

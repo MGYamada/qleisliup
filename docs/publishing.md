@@ -1,7 +1,6 @@
 # Publishing the source package
 
-Version 0.1.2 is prepared as a crates.io source package, not yet published by
-this version update. This document describes
+Version 0.1.2 is a source release for crates.io and GitHub. This document describes
 the release procedure; it does not itself authorize a registry upload. Production
 Qleisli distribution, manager artifacts, endpoints, and trust roots remain a
 separate task. See the [implementation plan](implementation-plan.md).
