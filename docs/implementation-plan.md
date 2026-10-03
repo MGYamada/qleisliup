@@ -546,6 +546,30 @@ power-loss/storage faults, live production distribution, and independent securit
 review remain separate acceptance scenarios. Production endpoints and trust
 remain unconfigured.
 
+## Version 0.1.1 integrated release validation, 2026-10-03
+
+The source release combines the packaging/native-delivery preparation and
+issues #2–#4. Its dependency audit found RUSTSEC-2026-0067 and
+RUSTSEC-2026-0068 in tar 0.4.44; tar is now fixed at 0.4.45, whose declared MSRV
+is 1.63. The updated Cargo.lock passed cargo-audit 0.22.2 against RustSec commit
+`f8dee89e1b2f2f1eaf548312df7655fe5202a302`: 1,288 advisories, 217 dependencies,
+zero vulnerabilities, zero warnings, and no ignored advisories.
+
+The integrated sources and updated lockfile passed the following on macOS ARM64:
+
+| Compiler | Debug/release builds, both binaries | Tests | Formatting | Clippy, warnings denied | CLI and restricted-PATH smoke checks |
+| --- | --- | --- | --- | --- | --- |
+| Rust 1.85.0 | Passed | 145 passed | Passed | Passed | Passed |
+| Rust 1.98.1, installed Homebrew stable release | Passed | 145 passed | Passed | Passed | Passed |
+
+The 145 executions consist of 51 shared unit cases in each binary harness and
+43 integration cases. Both standalone native fixtures passed formatting checks.
+PR #5 also passed all six compiler/host CI jobs before merging. The release PR
+and GitHub release record final integrated CI, clean-checkout source packaging,
+publish dry-run, isolated installation, and registry publication results.
+Production endpoints/trust and real Cargo-free distribution remain unconfigured;
+this release supplies source through crates.io and GitHub.
+
 ## Production prerequisites and release boundary
 
 Operational release readiness requires completion of Stages 1–4 and independent
