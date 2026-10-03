@@ -7,7 +7,11 @@ binary=${1:-"$project_root/target/debug/qleisliup"}
 binary_dir=$(CDPATH= cd -P "$(dirname "$binary")" && pwd)
 binary="$binary_dir/$(basename "$binary")"
 bootstrap=${2:-"$binary_dir/qleisliup-init"}
-version=$(sed -n 's/^version = "\([^"]*\)"$/\1/p' "$project_root/Cargo.toml")
+# Cargo normalizes dependency versions onto their own lines in packaged manifests.
+version=$(awk '
+    /^\[/ { package = ($0 == "[package]") }
+    package && /^version = "/ { split($0, parts, "\""); print parts[2]; exit }
+' "$project_root/Cargo.toml")
 smoke_dir=$(mktemp -d "${TMPDIR:-/tmp}/qleisliup-smoke.XXXXXXXX")
 trap 'rm -rf "$smoke_dir"' 0
 trap 'exit 1' HUP INT TERM

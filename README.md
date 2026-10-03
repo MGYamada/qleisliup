@@ -4,9 +4,16 @@ Qleisli toolchain lifecycle management.
 
 **Exact. Immutable. Authenticated. Explicit. Independent.**
 
+The intended end-user installation requires no Cargo or Rust toolchain:
+obtain a verified native `qleisliup-init`, install prebuilt Qleisli toolchains,
+and select exact versions through qleisliup. Cargo remains a development/build
+tool and an optional way to install the manager from source. This end-user
+distribution path is **not available yet**; see the
+[Cargo-free installation plan](docs/cargo-free-installation.md).
+
 ## Current status
 
-Version **0.1.0** implements **Stages 1–4: offline selection, local links,
+Version **0.1.1** implements **Stages 1–4: offline selection, local links,
 Unix proxies, TUF authentication, transactional toolchain installation,
 bootstrap, and manager self-update**.
 The manager supports help/version, `list`, `show`, `which`, `default`, `pin`,
@@ -19,16 +26,54 @@ without arguments prints help.
 New installs, bootstrap, and updates fail closed with exit status 1. Test repositories and keys are
 internal to the test harness; the CLI has no trust or endpoint override.
 Already installed exact releases can be reused offline. Externally installed
-managers refuse self-replacement. Version 0.1.0 is a GitHub source release;
-production toolchain distribution and prebuilt manager artifacts are not included.
-The package is not published to crates.io.
+managers refuse self-replacement. Version 0.1.1 prepares the source package for
+crates.io publication; publication is a separate step. Production toolchain
+distribution and prebuilt manager artifacts are not included.
 
-Rust **1.85** or newer is required; the Rust implementation edition is **2024**.
+Building from source requires Rust **1.85** or newer; the implementation edition
+is **2024**. Native manager operations do not require Cargo or rustc.
 The implementation uses semver, serde/serde_json, toml, Unix rustix filesystem
 operations, nix for direct execve, tough 0.24.0 for TUF, and bounded tar/zstd
 handling. Native aws-lc and zstd dependencies require a C/C++ toolchain and CMake;
 macOS builds use Xcode command-line tools, and Linux musl builds need musl-tools.
 Dependency versions are fixed and Cargo.lock is tracked.
+
+## Optional source installation with Cargo
+
+From a checkout of this version:
+
+```sh
+cargo install --path . --locked
+qleisliup --version
+qleisliup-init --help
+```
+
+After version 0.1.1 has been published to crates.io, the registry command is:
+
+```sh
+cargo install qleisliup --version 0.1.1 --locked
+```
+
+Cargo installs `qleisliup` and `qleisliup-init`. It does not install Qleisli,
+create proxy symlinks, or establish a bootstrap-owned manager. The bootstrap
+still requires production distribution configuration. Update a Cargo-installed
+manager with `cargo install` for the desired version; `qleisliup self update`
+refuses external installations.
+
+To use local toolchains with a default Cargo installation on a supported Unix
+host, create the proxy links explicitly (existing commands are not overwritten):
+
+```sh
+cargo_bin="${CARGO_HOME:-$HOME/.cargo}/bin"
+for tool in qli qleisli qargo qlippy qlifmt qlidoc; do
+    ln -s qleisliup "$cargo_bin/$tool"
+done
+qleisliup toolchain link dev /absolute/path/to/local/toolchain
+qli +dev --version
+```
+
+Ensure that directory is on PATH. If Cargo was installed with a custom `--root`,
+use its `bin` directory instead. Local toolchains remain unauthenticated.
 
 ## Build and inspect
 
@@ -41,7 +86,7 @@ cargo run --frozen -- --help
 cargo run --frozen -- --version
 ```
 
-The version command prints `qleisliup 0.1.0`. Cargo.toml is the version source;
+The version command prints `qleisliup 0.1.1`. Cargo.toml is the version source;
 the manager's version is independent of Qleisli and qargo versions.
 
 ## Local selection and pinning
@@ -99,6 +144,9 @@ semantics. No production distribution URL or trust root is configured.
 The initial target platforms are macOS ARM64, macOS x86_64, and Linux x86_64
 musl. Windows and Linux ARM64 are deferred. CI checks Stages 1–4 on the three
 initial platforms; it does not publish binaries.
+It also builds native release candidates and exercises local manager operations
+with Cargo, rustc, rustdoc, and rustup trapped on a restricted PATH. This does
+not establish live toolchain download or bootstrap readiness.
 
 ## Installation boundary
 
@@ -210,6 +258,10 @@ no other toolchain, PATH executable, or implicit shell is used as fallback.
 - [Stage 4 review](docs/review-stage4.md): manager and receipt boundary fixes.
 - [Working guidelines](AGENTS.md): repository development rules.
 - [Changelog](CHANGELOG.md): changes made to this project.
+- [Publishing guide](docs/publishing.md): source package contents and preflight checks.
+- [v0.1.1 notes](docs/releases/v0.1.1.md): packaging changes and distribution status.
+- [Cargo-free installation plan](docs/cargo-free-installation.md): native distribution
+  work and clean-machine acceptance scenarios.
 
 Development checks:
 
@@ -221,10 +273,15 @@ rustfmt --edition 2024 --check tests/fixtures/proxy_tool.rs
 rustfmt --edition 2024 --check tests/fixtures/manager_tool.rs
 cargo clippy --frozen --all-targets -- -D warnings
 sh scripts/check_cli.sh target/debug/qleisliup
+cargo build --release --frozen --bins
+sh scripts/check_cargo_free.sh target/release/qleisliup
+cargo package --locked
 git diff --check
 ```
 
 Run these checks with both Rust 1.85.0 and stable. Build output is ignored.
+Package verification may query the crates.io index even after a locked fetch;
+the build, test, and lint checks above remain offline.
 Integration tests use isolated temporary homes and synthetic local records.
 Internal transaction tests generate isolated signed TUF repositories, authenticate
 toolchain bundles and manager executables, check attack/failure paths, and kill

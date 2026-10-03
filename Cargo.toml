@@ -1,14 +1,31 @@
 [package]
 name = "qleisliup"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.85"
 license = "Apache-2.0"
 repository = "https://github.com/MGYamada/qleisliup"
+documentation = "https://github.com/MGYamada/qleisliup/blob/main/README.md"
 description = "Explicit, authenticated Qleisli toolchain lifecycle management"
 readme = "README.md"
+keywords = ["qleisli", "toolchain", "cli", "tuf"]
+categories = ["command-line-utilities", "development-tools"]
 default-run = "qleisliup"
-publish = false
+publish = ["crates-io"]
+include = [
+    "/Cargo.toml",
+    "/Cargo.lock",
+    "/README.md",
+    "/CHANGELOG.md",
+    "/LICENSE",
+    "/NOTICE",
+    "/AGENTS.md",
+    "/src/**",
+    "/tests/**",
+    "/scripts/check_cli.sh",
+    "/scripts/check_cargo_free.sh",
+    "/docs/**",
+]
 
 [dependencies]
 async-trait = "=0.1.92"

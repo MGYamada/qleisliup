@@ -1,4 +1,4 @@
-# qleisliup 0.1.0 implementation plan
+# qleisliup 0.1.1 implementation plan
 
 ## Delivery boundary
 
@@ -7,13 +7,19 @@ offline selection, exact defaults/pins, local links, Unix proxies, and TUF
 transactional toolchain installation, together
 with the adopted [specification](specification.md), development files, tests,
 and CI. Production endpoints/trust remain unconfigured. The Cargo package
-version is 0.1.0. The GitHub source release includes no prebuilt manager binary
-or available Qleisli distribution and is not published to crates.io.
+version is 0.1.1, with source packaging prepared for crates.io. Registry publication
+is separate and has not been performed as part of this preparation. The package
+includes no prebuilt manager binary or available Qleisli distribution.
 
 Keep delivery in this order: **local selection → links and proxies → TUF and
 transactional installation → bootstrap and self-update**. Each later stage
 requires an explicit follow-up implementation task. Do not change Qleisli or
 qargo as part of local development.
+
+The next requested delivery goal is **Cargo-free end-user installation and
+version management**. The native client implementation is present; native
+distribution and production activation are tracked below as Stage 5. Source
+publication to crates.io remains an optional installation channel.
 
 ## Stage 0: design and scaffold
 
@@ -422,6 +428,94 @@ unperformed locally. Process-group cleanup covers inherited helpers and is not
 a sandbox for authenticated code intentionally creating a different group or
 session. Production trust/endpoints remain unconfigured; no sibling repository
 or publication operation was changed.
+
+## Version 0.1.1 packaging validation, 2026-10-03
+
+Prepared the crates.io source package with an explicit include list, registry
+metadata, Cargo installation/proxy instructions, and a
+[publishing guide](publishing.md). Runtime behavior and dependency versions are
+unchanged. The proxy test now derives the manager version from Cargo.toml, and
+the smoke script reads only the package section of normalized Cargo manifests.
+
+Local checks ran on macOS ARM64 (`aarch64-apple-darwin`):
+
+| Compiler | Build, both binaries | Tests | Formatting | Clippy, warnings denied | CLI smoke, both binaries | Package verification |
+| --- | --- | --- | --- | --- | --- | --- |
+| Rust 1.85.0 | Passed | 135 passed | Passed | Passed | Passed | Passed |
+| Rust 1.98.1, installed Homebrew stable release | Passed | 135 passed | Passed | Passed | Passed | Passed through publish dry-run |
+
+Builds, tests, formatting, and lints used the locked graph offline. Initial
+offline packaging attempts required uncached registry lookups; online
+`cargo package --locked --allow-dirty` and
+`cargo publish --dry-run --locked --allow-dirty --registry crates-io` then passed,
+including compilation of the extracted package. The dry-run explicitly aborted
+before upload. CI now verifies source packaging with `--locked` on its existing
+six compiler/host jobs, permitting registry lookups for this step.
+
+At this packaging checkpoint, both archives contained 41 files. LICENSE, NOTICE, the complete Cargo.lock,
+executable entry points, native fixtures, and smoke script matched the checkout.
+All test targets compiled from the extracted stable package, and 21 focused
+cases passed: 17 link/proxy cases, 3 public manager CLI cases, and the signed
+bootstrap case exercising the packaged native manager fixture. The normalized
+manifest smoke check passed. A release-profile Cargo install from the extracted
+source into an isolated directory also passed the complete smoke check and
+reported version 0.1.1 for both installed executables.
+
+Local documentation links/examples, shell syntax, whitespace, and unchanged
+dependency lock entries were checked. The source was uncommitted for these
+preparation checks; publication still requires a clean release candidate.
+Linux/macOS x86_64 execution, remote CI, registry ownership/upload authorization,
+and the production distribution/security gates below remain unverified here.
+No registry upload, GitHub release, tag, or production distribution was created.
+
+## Stage 5: Cargo-free end-user distribution
+
+**Requested direction; production distribution remains planned.** Deliver a
+verified native bootstrap plus prebuilt Qleisli toolchains for the initial three
+hosts. End users must not need Cargo, rustc, Rust headers/libraries, a C/C++
+compiler, or CMake. See the [delivery plan](cargo-free-installation.md).
+
+Current preparation builds both release-mode manager executables and checks
+local CLI/link/proxy behavior with a restricted PATH whose Rust developer tool
+names are failure traps. This is configured for both Rust compilers on each CI
+host. Test fixtures do not establish real toolchain installation or production
+authentication. No release upload or production trust configuration is added.
+
+Remaining delivery work, in order:
+
+1. Validate independently produced native Qleisli/qargo bundles, exact component
+   identities, embedded stdlib/verifier arrangements, and real host linkage.
+2. Establish the production TUF authority, endpoint ownership, initial public
+   root, rotation/expiry policy, and verified bootstrap acquisition method.
+3. Configure the client with those approved public inputs and stage signed
+   toolchain and manager targets through the separate release process.
+4. On clean hosts without Rust developer tools, verify bootstrap, install,
+   exact/default/project selection, offline execution, updates, and rejection
+   of invalid distributions before making the end-user path available.
+
+No download URL, signing identity, or initial compiler bundle version is inferred
+from examples. Upstream source/build changes belong to their own repositories.
+
+### Preparation validation, 2026-10-03
+
+On macOS ARM64, Rust 1.85.0 and Homebrew stable Rust 1.98.1 both passed locked,
+offline release builds of qleisliup/qleisliup-init and the restricted-PATH runtime
+smoke check. A negative check confirmed that invoking Cargo and swallowing its
+failure still fails the wrapper. Both compiler builds produced ARM64 Mach-O
+executables; inspection of the stable binaries found only system dynamic library
+dependencies. This is local linkage evidence, not minimum-OS validation.
+
+Both compilers also verified the updated 43-file source archive. Its extracted
+runtime check script passed against the corresponding native release candidates,
+including reading Cargo's normalized manifest. Documentation links/examples,
+shell syntax, CI YAML and its six-job matrix, and whitespace checks passed.
+The prior 135-execution Rust suites remain the code-validation checkpoint above;
+this follow-up changed documentation, packaging, shell checks, and CI only.
+
+No real compiler bundle, production trust root, endpoint, signature, or hosted
+bootstrap was introduced. Other-host native execution, remote CI, successful
+live installation/update without Rust, and clean-machine upstream compatibility
+remain future acceptance work.
 
 ## Production prerequisites and release boundary
 

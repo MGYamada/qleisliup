@@ -1,4 +1,4 @@
-# qleisliup 0.1.0 specification
+# qleisliup 0.1.1 specification
 
 ## Status and responsibility
 
@@ -8,6 +8,9 @@ links, Unix proxies, TUF authentication, transactional installation/removal,
 bootstrap, and manager self-update.**
 Production distribution endpoints and the initial trusted root are unconfigured;
 new installs, bootstrap, and manager refreshes fail closed.
+Version 0.1.1 prepares a crates.io source package containing both executables;
+Cargo installation does not create proxies or bootstrap ownership. Registry
+publication does not configure or authenticate production toolchain distribution.
 Examples describe formats and
 interfaces; Qleisli 0.4.0 and qargo 0.2.1 are illustrative distribution versions,
 not announcements of published or compatible artifacts.
@@ -23,6 +26,15 @@ or certify compiler transformations, verifier correctness, or mathematical proof
 | qleisliup | Toolchain lifecycle and authenticated distribution |
 | qargo | Qrate lifecycle and its own checking/tool orchestration |
 | qrate | Qleisli package unit |
+
+The end-user distribution goal is native bootstrap and prebuilt toolchains on
+a machine without Rust, Cargo, a C/C++ compiler, or CMake. Cargo is permitted
+in maintainer builds and optional source installations, never as a subprocess
+of manager installation, selection, proxy execution, or update. A crates.io
+release is an additional source distribution channel, not completion of this
+goal. The [Cargo-free installation plan](cargo-free-installation.md) tracks the
+remaining native artifact and production trust work separately from implemented
+manager operations.
 
 Separate repositories and product versions permit a jointly tested distribution.
 qargo does not link a qleisliup library. Its present implementation links Qleisli
