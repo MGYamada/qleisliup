@@ -4,6 +4,8 @@ Qleisli toolchain lifecycle management.
 
 **Exact. Immutable. Authenticated. Explicit. Independent.**
 
+**Qleisli, Qargo, qlippy, qlifmt, and qlidoc are independent projects and are not affiliated with, endorsed by, or sponsored by the Rust Project or the Rust Foundation.**
+
 The intended end-user installation requires no Cargo or Rust toolchain:
 obtain a verified native `qleisliup-init`, install prebuilt Qleisli toolchains,
 and select exact versions through qleisliup. Cargo remains a development/build
@@ -19,7 +21,7 @@ for ownership, exact dependency records, and pending upstream acceptance work.
 
 ## Current status
 
-Version **0.1.2** implements **Stages 1–4: offline selection, local links,
+Version **0.1.3** implements **Stages 1–4: offline selection, local links,
 Unix proxies, TUF authentication, transactional toolchain installation,
 bootstrap, and manager self-update**.
 The manager supports help/version, `list`, `show`, `which`, `default`, `pin`,
@@ -32,7 +34,7 @@ without arguments prints help.
 New installs, bootstrap, and updates fail closed with exit status 1. Test repositories and keys are
 internal to the test harness; the CLI has no trust or endpoint override.
 Already installed exact releases can be reused offline. Externally installed
-managers refuse self-replacement. Version 0.1.2 is a source release for
+managers refuse self-replacement. Version 0.1.3 is a source release for
 crates.io and GitHub. Production toolchain
 distribution and prebuilt manager artifacts are not included.
 
@@ -54,10 +56,10 @@ qleisliup --version
 qleisliup-init --help
 ```
 
-Install version 0.1.2 from crates.io:
+Install version 0.1.3 from crates.io:
 
 ```sh
-cargo install qleisliup --version 0.1.2 --locked
+cargo install qleisliup --version 0.1.3 --locked
 ```
 
 Cargo installs `qleisliup` and `qleisliup-init`. It does not install Qleisli,
@@ -92,7 +94,7 @@ cargo run --frozen -- --help
 cargo run --frozen -- --version
 ```
 
-The version command prints `qleisliup 0.1.2`. Cargo.toml is the version source;
+The version command prints `qleisliup 0.1.3`. Cargo.toml is the version source;
 the manager's version is independent of Qleisli and qargo versions.
 
 ## Local selection and pinning
@@ -284,6 +286,7 @@ no other toolchain, PATH executable, or implicit shell is used as fallback.
 - [Working guidelines](AGENTS.md): repository development rules.
 - [Changelog](CHANGELOG.md): changes made to this project.
 - [Publishing guide](docs/publishing.md): source package contents and preflight checks.
+- [v0.1.3 notes](docs/releases/v0.1.3.md): version update and project independence notice.
 - [v0.1.2 notes](docs/releases/v0.1.2.md): environment policy and runtime checks.
 - [v0.1.1 notes](docs/releases/v0.1.1.md): previous source release and lifecycle fixes.
 - [Cargo-free installation plan](docs/cargo-free-installation.md): native distribution

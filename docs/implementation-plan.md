@@ -1,4 +1,4 @@
-# qleisliup 0.1.2 implementation plan
+# qleisliup 0.1.3 implementation plan
 
 ## Delivery boundary
 
@@ -7,7 +7,7 @@ offline selection, exact defaults/pins, local links, Unix proxies, and TUF
 transactional toolchain installation, together
 with the adopted [specification](specification.md), development files, tests,
 and CI. Production endpoints/trust remain unconfigured. The Cargo package
-version is 0.1.2, with a source release for crates.io and GitHub. The package
+version is 0.1.3, with a source release for crates.io and GitHub. The package
 includes no prebuilt manager binary or available Qleisli distribution.
 
 Keep delivery in this order: **local selection → links and proxies → TUF and
@@ -696,6 +696,43 @@ zero vulnerabilities, zero warnings, and no ignored advisories. Publication
 requires the final supported-host CI results, clean package/dry-run verification,
 and a matching merged source tree. The GitHub release records those results,
 the release commit, and the checksum of the published source crate.
+
+## Version 0.1.3 preparation validation, 2026-10-07
+
+Cargo.toml and the root Cargo.lock entry identify qleisliup 0.1.3. Current
+design/publishing docs and new release notes use that version; prior release
+records and the published 0.1.2 registry installation example are retained.
+Runtime sources, dependency versions, and state formats are unchanged.
+
+Checks ran on macOS ARM64 with the locked graph, offline:
+
+| Compiler | Debug build, both binaries | Tests | Formatting | Clippy, warnings denied | CLI smoke |
+| --- | --- | --- | --- | --- | --- |
+| Rust 1.85.0 | Passed | 173 passed | Passed | Passed | Passed |
+| Rust 1.98.1, installed Homebrew stable release | Passed | 173 passed | Passed | Passed | Passed |
+
+Formatting includes both standalone native fixtures. The full suites ran outside
+the local execution sandbox because its Unix-socket restriction rejected an
+existing fixture. Both binaries report 0.1.3; whitespace checks passed.
+Release builds, restricted-PATH runtime checks, package verification, dependency
+audits, remote CI, and other-host execution were not rerun for this version-only
+preparation. No registry upload, tag, or GitHub release was created. Production
+endpoints/trust and real bundle compatibility remain separate acceptance work.
+
+## Version 0.1.3 release preflight, 2026-10-07
+
+The user authorized crates.io and GitHub publication of 0.1.3. The README now
+states that Qleisli, Qargo, qlippy, qlifmt, and qlidoc are independent projects
+without affiliation, endorsement, or sponsorship from the Rust Project or the
+Rust Foundation; CHANGELOG records the notice. Current registry installation
+examples target 0.1.3. Runtime sources and locked dependency versions are
+unchanged. The earlier preparation-only checkpoint remains a historical record.
+
+Publication requires the six supported compiler/host CI jobs, a current audit
+of the exact dependency graph, clean source package verification and publish
+dry-run, and a merged source tree matching the validated candidate. The GitHub
+release records the final results, commit, and published source asset checksum.
+Production distribution and trust configuration remain outside this release.
 
 ## Production prerequisites and release boundary
 

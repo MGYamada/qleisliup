@@ -1,4 +1,4 @@
-# qleisliup 0.1.2 specification
+# qleisliup 0.1.3 specification
 
 ## Status and responsibility
 
@@ -8,7 +8,7 @@ links, Unix proxies, TUF authentication, transactional installation/removal,
 bootstrap, and manager self-update.**
 Production distribution endpoints and the initial trusted root are unconfigured;
 new installs, bootstrap, and manager refreshes fail closed.
-Version 0.1.2 contains both executables in one crates.io source package.
+Version 0.1.3 contains both executables in one crates.io source package.
 Cargo installation does not create proxies or bootstrap ownership. Registry
 publication does not configure or authenticate production toolchain distribution.
 Examples describe formats and

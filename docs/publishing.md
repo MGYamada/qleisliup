@@ -1,7 +1,7 @@
 # Publishing the source package
 
-Version 0.1.2 is a source release for crates.io and GitHub. This document describes
-the release procedure; it does not itself authorize a registry upload. Production
+Version 0.1.3 is a source release for crates.io and GitHub. This
+document describes the release procedure; it does not itself authorize a registry upload. Production
 Qleisli distribution, manager artifacts, endpoints, and trust roots remain a
 separate task. See the [implementation plan](implementation-plan.md).
 
@@ -47,12 +47,12 @@ Do not skip package verification. For review of uncommitted preparation changes,
 Use `--offline` for a cached dry run when registry access is unavailable, and
 record that the live registry and account permissions were not checked.
 
-The archive is written to `target/package/qleisliup-0.1.2.crate`. Check that
+The archive is written to `target/package/qleisliup-0.1.3.crate`. Check that
 LICENSE, NOTICE, Cargo.lock, both executable entry points, and native fixtures
 are present. Test the extracted source as well:
 
 ```sh
-cd target/package/qleisliup-0.1.2
+cd target/package/qleisliup-0.1.3
 cargo test --frozen --all-targets
 cargo build --frozen
 sh scripts/check_cli.sh target/debug/qleisliup

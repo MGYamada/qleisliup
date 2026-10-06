@@ -2,6 +2,16 @@
 
 Product versions are independent of distribution and state schema versions.
 
+## 0.1.3 - 2026-10-07
+
+- Update the Cargo package and both executable version outputs to 0.1.3.
+- Synchronize current documentation and add version preparation notes; retain
+  historical release records.
+- Clarify in the README that Qleisli, Qargo, qlippy, qlifmt, and qlidoc are
+  independent projects without affiliation, endorsement, or sponsorship from
+  the Rust Project or the Rust Foundation.
+- Keep runtime behavior, dependency versions, and state formats unchanged.
+
 ## 0.1.2 - 2026-10-03
 
 - Adopt separate Rust/Lean distribution-time dependency resolution and
