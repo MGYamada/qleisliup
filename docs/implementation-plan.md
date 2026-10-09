@@ -767,8 +767,11 @@ endpoints/trust and real bundle compatibility remain separate acceptance work.
 The user authorized crates.io and GitHub publication of 0.1.4. README now
 records the maintainer's temporary suspension of qleisliup development to focus
 on Qleisli itself and ends after that notice. Design docs, CHANGELOG, and
-release notes reflect this decision. Development checks remain documented in
-the publishing guide. Runtime sources and locked dependency versions are
+release notes reflect this decision. Optional Cargo installation, native build
+prerequisites, and local proxy setup remain in the source installation guide;
+the Cargo-free plan points there and historical release notes link to their
+tagged READMEs. Development checks remain documented in the publishing guide.
+Runtime sources and locked dependency versions are
 unchanged.
 
 In addition to the preparation checks above, Rust 1.85.0 and Homebrew stable
