@@ -1,6 +1,6 @@
 # Publishing the source package
 
-Version 0.1.3 is a source release for crates.io and GitHub. This
+Version 0.1.4 is a source release for crates.io and GitHub. This
 document describes the release procedure; it does not itself authorize a registry upload. Production
 Qleisli distribution, manager artifacts, endpoints, and trust roots remain a
 separate task. See the [implementation plan](implementation-plan.md).
@@ -26,8 +26,24 @@ Cargo.lock, README, the specification, implementation plan, and release notes
 agree on the product version, and that CHANGELOG records the actual changes.
 Retain historical version examples and prior release notes.
 
-Run the development checks in [README](../README.md) with Rust 1.85.0 and stable
-and inspect the supported-host CI results. Audit the exact Cargo.lock with a
+Run these development checks with Rust 1.85.0 and stable, selecting the intended
+compiler for Cargo and rustfmt, and inspect the supported-host CI results:
+
+```sh
+cargo build --frozen
+cargo test --frozen --all-targets
+cargo fmt --all --check
+rustfmt --edition 2024 --check tests/fixtures/proxy_tool.rs
+rustfmt --edition 2024 --check tests/fixtures/manager_tool.rs
+cargo clippy --frozen --all-targets -- -D warnings
+sh scripts/check_cli.sh target/debug/qleisliup
+cargo build --release --frozen --bins
+sh scripts/check_runtime_guard.sh
+sh scripts/check_cargo_free.sh target/release/qleisliup
+git diff --check
+```
+
+Audit the exact Cargo.lock with a
 current RustSec database using `cargo audit`; resolve reported vulnerabilities
 before publication and record the auditor/database versions. Then inspect and
 verify the archive:
@@ -47,12 +63,12 @@ Do not skip package verification. For review of uncommitted preparation changes,
 Use `--offline` for a cached dry run when registry access is unavailable, and
 record that the live registry and account permissions were not checked.
 
-The archive is written to `target/package/qleisliup-0.1.3.crate`. Check that
+The archive is written to `target/package/qleisliup-0.1.4.crate`. Check that
 LICENSE, NOTICE, Cargo.lock, both executable entry points, and native fixtures
 are present. Test the extracted source as well:
 
 ```sh
-cd target/package/qleisliup-0.1.3
+cd target/package/qleisliup-0.1.4
 cargo test --frozen --all-targets
 cargo build --frozen
 sh scripts/check_cli.sh target/debug/qleisliup

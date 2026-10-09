@@ -1,13 +1,16 @@
-# qleisliup 0.1.3 implementation plan
+# qleisliup 0.1.4 implementation plan
 
 ## Delivery boundary
+
+Development is temporarily suspended at version 0.1.4 while the maintainer
+focuses on developing Qleisli itself.
 
 The current delivery is **Stage 4: bootstrap and manager self-update**, following
 offline selection, exact defaults/pins, local links, Unix proxies, and TUF
 transactional toolchain installation, together
 with the adopted [specification](specification.md), development files, tests,
 and CI. Production endpoints/trust remain unconfigured. The Cargo package
-version is 0.1.3, with a source release for crates.io and GitHub. The package
+version is 0.1.4, with a source release for crates.io and GitHub. The package
 includes no prebuilt manager binary or available Qleisli distribution.
 
 Keep delivery in this order: **local selection → links and proxies → TUF and
@@ -733,6 +736,58 @@ of the exact dependency graph, clean source package verification and publish
 dry-run, and a merged source tree matching the validated candidate. The GitHub
 release records the final results, commit, and published source asset checksum.
 Production distribution and trust configuration remain outside this release.
+
+## Version 0.1.4 preparation validation, 2026-10-09
+
+Cargo.toml and the root Cargo.lock entry identify qleisliup 0.1.4. Current
+design/publishing docs and new release notes use that version; historical
+release records are retained. Runtime sources, dependency versions, and state
+formats are unchanged.
+
+Checks ran on macOS ARM64 with the locked graph, offline:
+
+| Compiler | Debug build, both binaries | Tests | Formatting | Clippy, warnings denied | CLI smoke |
+| --- | --- | --- | --- | --- | --- |
+| Rust 1.85.0 | Passed | 173 passed | Passed | Passed | Passed |
+| Rust 1.98.1, installed Homebrew stable release | Passed | 173 passed | Passed | Passed | Passed |
+
+Formatting includes both standalone native fixtures. Initial sandboxed test
+runs rejected the existing Unix-socket fixture; both complete suites then passed
+outside the local execution sandbox. Both binaries report 0.1.4. Local
+documentation links, whitespace, and the version-only Cargo.lock change were
+checked.
+
+Release builds, restricted-PATH runtime checks, package verification, dependency
+audits, remote CI, and other-host execution were not rerun for this version-only
+preparation. No registry upload, tag, or GitHub release was created. Production
+endpoints/trust and real bundle compatibility remain separate acceptance work.
+
+## Version 0.1.4 release preflight, 2026-10-09
+
+The user authorized crates.io and GitHub publication of 0.1.4. README now
+records the maintainer's temporary suspension of qleisliup development to focus
+on Qleisli itself and ends after that notice. Design docs, CHANGELOG, and
+release notes reflect this decision. Development checks remain documented in
+the publishing guide. Runtime sources and locked dependency versions are
+unchanged.
+
+In addition to the preparation checks above, Rust 1.85.0 and Homebrew stable
+Rust 1.98.1 passed release builds of both binaries, the runtime guard's negative
+cases, restricted-PATH native checks, and offline source package verification
+on macOS ARM64. These runtime checks use local fixtures and do not establish
+production distribution readiness.
+
+The exact Cargo.lock passed cargo-audit 0.22.2 with warnings denied against
+RustSec database commit `550efd3d587a29b2e2c2b21b17a440da4fede999`
+(1,295 advisories): 217 dependencies, zero vulnerabilities, zero warnings,
+and no ignored advisories. crates.io ownership was verified and 0.1.4 was
+absent before publication.
+
+Publication requires the six supported compiler/host CI jobs, clean source
+package verification and publish dry-run, extracted-source and isolated-install
+checks, and a matching merged source tree. The GitHub release records final
+results, the release commit, and the published source asset checksum. Production
+distribution and trust configuration remain outside this release.
 
 ## Production prerequisites and release boundary
 
