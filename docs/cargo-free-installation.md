@@ -19,7 +19,8 @@ because production endpoints and the initial trusted root are absent. Publishing
 the Rust source package to crates.io does not remove this missing configuration.
 
 Existing valid exact installations and local links work offline. The source
-installation described in [README](../README.md) is an optional developer path.
+installation described in the [source installation guide](source-installation.md)
+is an optional developer path.
 qleisliup never invokes Cargo to install or build Qleisli as a fallback.
 
 ## Intended user flow

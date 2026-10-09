@@ -2,6 +2,19 @@
 
 Product versions are independent of distribution and state schema versions.
 
+## 0.1.4 - 2026-10-09
+
+- Update the Cargo package and both executable version outputs to 0.1.4.
+- Synchronize current documentation and add version preparation notes; retain
+  historical release records.
+- Replace README's current status with a temporary development suspension
+  notice at 0.1.4 while the maintainer focuses on Qleisli itself; remove all
+  subsequent README sections.
+- Preserve optional source installation and native build prerequisites in a
+  dedicated guide; update current references and pin historical README links
+  to their corresponding release tags.
+- Keep runtime behavior, dependency versions, and state formats unchanged.
+
 ## 0.1.3 - 2026-10-07
 
 - Update the Cargo package and both executable version outputs to 0.1.3.
