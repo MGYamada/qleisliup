@@ -1,8 +1,8 @@
-# qleisliup 0.1.4 implementation plan
+# qleisliup 0.1.5 implementation plan
 
 ## Delivery boundary
 
-Development is temporarily suspended at version 0.1.4 while the maintainer
+Development is temporarily suspended at version 0.1.5 while the maintainer
 focuses on developing Qleisli itself.
 
 The current delivery is **Stage 4: bootstrap and manager self-update**, following
@@ -10,7 +10,7 @@ offline selection, exact defaults/pins, local links, Unix proxies, and TUF
 transactional toolchain installation, together
 with the adopted [specification](specification.md), development files, tests,
 and CI. Production endpoints/trust remain unconfigured. The Cargo package
-version is 0.1.4, with a source release for crates.io and GitHub. The package
+version is 0.1.5, with a source release for crates.io and GitHub. The package
 includes no prebuilt manager binary or available Qleisli distribution.
 
 Keep delivery in this order: **local selection → links and proxies → TUF and
@@ -791,6 +791,62 @@ package verification and publish dry-run, extracted-source and isolated-install
 checks, and a matching merged source tree. The GitHub release records final
 results, the release commit, and the published source asset checksum. Production
 distribution and trust configuration remain outside this release.
+
+## Version 0.1.5 preparation validation, 2026-10-11
+
+README's updated independence notice includes qleisliup and qleisliup-init,
+uses lowercase qargo consistently, and replaces the opening tagline. A separate
+notice attributes the Rust and Cargo trademarks to the Rust Foundation.
+CHANGELOG and the new release notes record these changes.
+
+Cargo.toml and the root Cargo.lock entry identify qleisliup 0.1.5. Current
+documentation and source installation examples use that version, with registry
+installation explicitly conditional on publication. Prior release records are
+retained. Development remains temporarily suspended while the maintainer focuses
+on Qleisli itself. Runtime sources, dependency versions, and state formats are
+unchanged.
+
+Checks ran on macOS ARM64 with the locked graph, offline:
+
+| Compiler | Debug build, both binaries | Tests | Formatting | Clippy, warnings denied | CLI smoke |
+| --- | --- | --- | --- | --- | --- |
+| Rust 1.85.0 | Passed | 173 passed | Passed | Passed | Passed |
+| Rust 1.99.0, installed rustup stable | Passed | 173 passed | Passed | Passed | Passed |
+
+Formatting includes both standalone native fixtures. Both binaries report
+0.1.5. Initial compiler-path/cache mismatches were resolved by selecting each
+complete toolchain through PATH and using fresh per-compiler output directories.
+The full test suites ran outside the local execution sandbox for the existing
+Unix-socket fixture. Local documentation links, whitespace, and the version-only
+Cargo.lock change were checked.
+
+Release builds, restricted-PATH runtime checks, package verification, dependency
+audits, remote CI, and other-host execution were not rerun for this documentation
+and version preparation. No registry upload, tag, or GitHub release was created.
+Production endpoints/trust and real bundle compatibility remain separate
+acceptance work.
+
+## Version 0.1.5 release preflight, 2026-10-11
+
+The user authorized crates.io and GitHub publication of 0.1.5. Current source
+installation examples and release instructions target that version. README's
+expanded independence notice and Rust/Cargo trademark attribution are recorded
+in CHANGELOG and release notes; the development suspension remains in effect.
+Runtime sources and locked dependency versions are unchanged. The preparation
+checkpoint above remains a historical record.
+
+The exact Cargo.lock passed cargo-audit 0.22.2 with warnings denied against
+RustSec database commit `7eebec69c352c7191b1f13eb95dd510eeca5d1de`
+(1,296 advisories): 217 dependencies, zero vulnerabilities, zero warnings,
+and no ignored advisories. crates.io ownership was verified and 0.1.5 was
+absent before publication.
+
+Publication requires the six supported compiler/host CI jobs, native release
+builds and runtime guard checks, clean source package verification and publish
+dry-run, extracted-source and isolated-install checks, and a matching merged
+source tree. The GitHub release records the final results, release commit,
+and published source asset checksum. Production distribution and trust
+configuration remain outside this release.
 
 ## Production prerequisites and release boundary
 

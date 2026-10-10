@@ -2,6 +2,16 @@
 
 Product versions are independent of distribution and state schema versions.
 
+## 0.1.5 - 2026-10-11
+
+- Expand README's independence notice to include qleisliup and qleisliup-init,
+  use lowercase qargo consistently, and replace the opening tagline with it.
+- Add README's attribution that Rust and Cargo are trademarks of the Rust
+  Foundation.
+- Update the Cargo package and both executable version outputs to 0.1.5;
+  synchronize current documentation and add release preparation notes.
+- Keep runtime behavior, dependency versions, and state formats unchanged.
+
 ## 0.1.4 - 2026-10-09
 
 - Update the Cargo package and both executable version outputs to 0.1.4.
