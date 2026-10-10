@@ -2,9 +2,9 @@
 
 Qleisli toolchain lifecycle management.
 
-**Exact. Immutable. Authenticated. Explicit. Independent.**
+**Qleisli and its tools (qargo, qlippy, qlifmt, qlidoc, qleisliup, and qleisliup-init) are independent projects and are not affiliated with, endorsed by, or sponsored by the Rust Project or the Rust Foundation.**
 
-**Qleisli, Qargo, qlippy, qlifmt, and qlidoc are independent projects and are not affiliated with, endorsed by, or sponsored by the Rust Project or the Rust Foundation.**
+**Rust and Cargo are trademarks of the Rust Foundation.**
 
 The intended end-user installation requires no Cargo or Rust toolchain:
 obtain a verified native `qleisliup-init`, install prebuilt Qleisli toolchains,
@@ -23,4 +23,4 @@ for ownership, exact dependency records, and pending upstream acceptance work.
 
 The maintainer has decided to temporarily suspend qleisliup development
 to focus on developing Qleisli itself. qleisliup is therefore on hold
-at version **0.1.4**.
+at version **0.1.5**.

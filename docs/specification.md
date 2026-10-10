@@ -1,8 +1,8 @@
-# qleisliup 0.1.4 specification
+# qleisliup 0.1.5 specification
 
 ## Status and responsibility
 
-Development is temporarily suspended at version 0.1.4 while the maintainer
+Development is temporarily suspended at version 0.1.5 while the maintainer
 focuses on developing Qleisli itself.
 
 This is the adopted design contract for the first operational manager. **Stages
@@ -11,7 +11,7 @@ links, Unix proxies, TUF authentication, transactional installation/removal,
 bootstrap, and manager self-update.**
 Production distribution endpoints and the initial trusted root are unconfigured;
 new installs, bootstrap, and manager refreshes fail closed.
-Version 0.1.4 contains both executables in one crates.io source package.
+Version 0.1.5 contains both executables in one source package for crates.io.
 Cargo installation does not create proxies or bootstrap ownership. Registry
 publication does not configure or authenticate production toolchain distribution.
 Examples describe formats and

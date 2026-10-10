@@ -1,6 +1,6 @@
 # Optional source installation with Cargo
 
-Source installation is an optional developer path for qleisliup 0.1.4.
+Source installation is an optional developer path for qleisliup 0.1.5.
 The intended native end-user distribution remains unavailable; see the
 [Cargo-free installation plan](cargo-free-installation.md).
 The maintainer has temporarily suspended qleisliup development to focus on
@@ -18,7 +18,7 @@ command-line tools; Linux musl builds also require musl-tools.
 From crates.io:
 
 ```sh
-cargo install qleisliup --version 0.1.4 --locked
+cargo install qleisliup --version 0.1.5 --locked
 qleisliup --version
 qleisliup-init --version
 ```
@@ -31,7 +31,7 @@ qleisliup --version
 qleisliup-init --version
 ```
 
-Both executables report version 0.1.4. Cargo installs `qleisliup` and
+Both executables report version 0.1.5. Cargo installs `qleisliup` and
 `qleisliup-init`; it does not install Qleisli, create proxy links, or establish
 bootstrap ownership. Production endpoints and the initial trusted TUF root
 remain unconfigured, so new toolchain downloads and bootstrap fail closed.
