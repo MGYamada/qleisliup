@@ -8,15 +8,15 @@ owned by each consuming project. qleisliup manages authenticated Qleisli
 toolchains; it is not a general language environment or package resolver.
 
 This policy extends [Stage 5](implementation-plan.md#stage-5-cargo-free-end-user-distribution).
-The native manager and its local runtime checks exist. A compatible real
-Qleisli/qargo bundle, a distributable Lean kernel, and a jointly tested Python
-wheel/environment remain upstream delivery and acceptance work. Production
-endpoints and trust remain unconfigured. No version in an example chooses an
-upstream release or asserts compatibility.
+The native manager supports local use of Qleisli 0.3.0 and qlirgo 0.2.0 with
+the matching Lean kernel. The released components passed local checks on macOS
+ARM64. Supported-host bundle acceptance and a jointly tested Python
+wheel/environment remain upstream delivery work. Production endpoints and
+trust remain unconfigured.
 
 | Layer | End-user environment | Build and dependency owner |
 | --- | --- | --- |
-| Rust compiler and qargo implementation | Native executables and their supported runtime dependencies | Upstream CI: an exact Rust compiler, tracked Cargo.lock, and fixed build inputs |
+| Rust compiler and qlirgo implementation | Native executables and their supported runtime dependencies | Upstream CI: an exact Rust compiler, tracked Cargo.lock, and fixed build inputs |
 | Lean kernel, when supported by the selected release | Native kernel plus every required non-system runtime library/data file | Upstream CI: lean-toolchain and Lake manifests; proof development remains separate |
 | Python connection package | A project-local virtual environment | Python project: uv, an exact Python version, exact connection wheel, and locked dependencies |
 | Qleisli installation and selection | qleisliup and its native proxies | qleisliup: TUF verification, exact identities, and explicit lifecycle operations |
@@ -157,13 +157,13 @@ Delivery order and required evidence:
 
 1. Maintain this policy, the manager's restricted-PATH checks, and the existing
    CLI/pin contract in qleisliup. These do not require an upstream bundle.
-2. Validate the full real Rust-built compiler/qargo bundle on macOS ARM64,
+2. Validate the full compiler/qlirgo bundle on macOS ARM64,
    macOS x86_64, and Linux x86_64 musl without developer tools. Record exact
    component identities, linked checker alignment, host linkage, real operations,
    and offline proxy/inspection behavior.
-3. Add a Lean kernel only after the upstream release meets its distribution and
-   compatibility gates. Validate relocated execution, an unrelated kernel first
-   on PATH, absent build caches, and missing/rejecting/incompatible kernel errors.
+3. Validate the Lean kernel for every production host. Check relocated execution,
+   an unrelated kernel first on PATH, absent build caches, and
+   missing/rejecting/incompatible kernel errors.
 4. In separately scoped upstream Python work, produce the wheel, locked sample
    projects, and compatibility CI. Recreate two isolated projects from locks;
    test a conflicting PATH compiler and selection override; disconnect networking

@@ -53,7 +53,7 @@ qleisliup default stable
 qleisliup self update
 ```
 
-Bootstrap creates the manager and six proxies but installs no toolchain. An
+Bootstrap creates the manager and eight proxies but installs no toolchain. An
 install never changes the default; `default stable` resolves the locally observed
 stable version and stores that exact identity. A repository pin takes precedence
 over the global default, and changing the default does not rewrite that pin.
@@ -66,27 +66,23 @@ or download. Users can retain several installed versions simultaneously.
 | Deliverable | Required preparation | Current status |
 | --- | --- | --- |
 | Native bootstrap and manager | Release-mode binaries for macOS ARM64/x86_64 and Linux x86_64 musl; native execution/linkage checks | Both executables build; local runtime checks and CI candidate builds are available. No public bootstrap artifact is supplied here. |
-| Exact Qleisli distribution | Native compiler, matching stdlib identity, qargo and its auxiliary executables, truthful checker/verifier bindings, LICENSE and NOTICE | The manager's bundle format and synthetic acceptance tests exist; real upstream bundle validation is pending. |
+| Exact Qleisli distribution | Native compiler and kernel, matching stdlib identity, qlirgo and its auxiliary executables, truthful checker/verifier bindings, LICENSE and NOTICE | Schema 2 supports the Qleisli 0.3.0 and qlirgo 0.2.0 pair. macOS ARM64 local execution passed with the released components. Production bundle and supported-host acceptance remain pending. |
 | Initial bootstrap authenticity | A documented verification method for the first downloaded native executable | Pending; a checksum fetched with an otherwise unverified executable is not a new trust authority. |
 | Production TUF repository | Owned metadata/target endpoints, approved initial public root, role custodians/thresholds, expiry and rotation procedures | Unconfigured. Test roots must never be used. |
 | Clean-machine acceptance | Actual install, switch, pin, proxy, and update workflows without Rust, Lean, Python, or native build tools | Local fixture checks exist; real distribution acceptance remains pending. |
 | Native Lean kernel | Compatible upstream release, complete runtime files, relocated native execution, truthful verifier arrangement | Pending upstream gates; installing a kernel does not transfer acceptance authority. |
 | Python connections | Separate wheel/PyPI delivery, fixed Python and package locks, explicit absolute compiler path, compatibility CI | Separate upstream work; not installed or authenticated by qleisliup. |
 
-The distribution boundary remains the
-[specified complete bundle](specification.md#distribution-and-internal-manifests).
-A separately available qargo binary archive or compiler executable does not by
-itself satisfy that contract. qargo's linked checker can differ from the selected
-standalone compiler and must be recorded and tested truthfully. Upstream changes
-and bundle production require their own work; this repository does not depend on
-or mutate sibling checkouts.
+The [complete bundle format](specification.md#distribution-and-internal-manifests)
+binds separately released components to one authenticated distribution. Record
+qlirgo's actual linked Qleisli release alongside the standalone compiler
+version. The formal pair aligns both with Qleisli 0.3.0 and uses the matching
+native kernel. Production bundle assembly and trust setup are separate steps.
 
-For the first production distribution, choose the exact Qleisli/std release and
-coordinate a qargo release with that linked checker, following the upstream
-[compatibility plan](https://github.com/MGYamada/qargo/blob/main/docs/toolchains.md#qleisliup-compatibility-plan).
-A visible checker mismatch remains representable for development but does not
-complete this release-alignment milestone. No production compiler version is
-selected by the illustrative CLI examples above.
+The published Qleisli 0.3.0 native kernel archives target macOS ARM64 and
+Linux x86_64 GNU. Coverage for macOS x86_64 and the Linux x86_64 musl
+distribution still requires compatible native kernel builds and validation.
+[Qleisli 0.3.0 release assets](https://github.com/MGYamada/Qleisli/releases/tag/v0.3.0)
 
 Native binaries must be produced and exercised on the three initial hosts.
 Linux distribution binaries use static musl linkage; macOS binaries must use the
@@ -165,12 +161,12 @@ These are planned acceptance checks, not completed results:
 1. On each clean supported host with no Rust/Lean/Python or C/C++ build tools, verify
    the native bootstrap out of band and install the managed manager/proxies.
 2. Authenticate and install two real exact toolchain releases. Verify actual
-   compiler and qargo behavior, embedded resources, and the linked checker
+   compiler and qlirgo behavior, embedded resources, and the linked checker
    identity without a build, source checkout, or developer-tool invocation.
 3. Change the exact default, apply a repository pin, use a leading selector,
    and run `sync` from a fresh repository. Check precedence and that installation
    never changes the default or another repository's pin.
-4. Disconnect the network. Run both compiler aliases and qargo through the
+4. Disconnect the network. Run both compiler aliases and qlirgo through the
    existing selection; inspect list/show/which without a metadata refresh.
 5. Reconnect, install a newer stable distribution, and update the owned manager.
    Check that old exact releases, pins, and the default remain intact until

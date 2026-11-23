@@ -5,7 +5,7 @@ use crate::error::{Error, Result};
 
 pub(crate) fn invoked_tool(invoked: &OsStr) -> Option<&str> {
     let name = Path::new(invoked).file_name()?.to_str()?;
-    (name == "qli" || crate::toolchain::TOOLS.contains(&name)).then_some(name)
+    crate::toolchain::proxy_name(name).then_some(name)
 }
 
 #[cfg(unix)]
@@ -56,6 +56,23 @@ pub(crate) fn run(tool: &str, mut args: &[OsString]) -> Result<()> {
     );
     let mut environment: std::collections::BTreeMap<OsString, OsString> =
         std::env::vars_os().collect();
+    let kernel_key = OsStr::new("QLEISLI_KERNEL");
+    let default_key = OsStr::new("QLEISLIUP_DEFAULT_KERNEL");
+    // Recompute an inherited proxy default when a nested call changes selection.
+    if environment
+        .remove(default_key)
+        .is_some_and(|previous| environment.get(kernel_key) == Some(&previous))
+    {
+        environment.remove(kernel_key);
+    }
+    if let Some(kernel) = toolchain
+        .native_kernel()
+        .filter(|_| !environment.contains_key(kernel_key))
+    {
+        let kernel = kernel.into_os_string();
+        environment.insert(kernel_key.into(), kernel.clone());
+        environment.insert(default_key.into(), kernel);
+    }
     environment.insert("PATH".into(), path);
     environment.insert("QLEISLIUP_TOOLCHAIN".into(), toolchain.name.into());
     environment.insert("QLEISLIUP_HOME".into(), home.path.into_os_string());

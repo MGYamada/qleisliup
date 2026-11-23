@@ -1,6 +1,6 @@
 [package]
 name = "qleisliup"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2024"
 rust-version = "1.85"
 license = "Apache-2.0"
@@ -32,7 +32,7 @@ include = [
 
 [dependencies]
 async-trait = "=0.1.92"
-futures-util = "=0.3.31"
+futures-util = "=0.3.32"
 jiff = "=0.2.37"
 semver = "=1.0.28"
 serde = { version = "=1.0.228", features = ["derive"] }
@@ -40,15 +40,15 @@ serde_json = "=1.0.145"
 toml = { version = "=0.8.23", default-features = false, features = ["parse"] }
 sha2 = "=0.10.9"
 tar = { version = "=0.4.46", default-features = false }
-tokio = { version = "=1.48.0", features = ["rt-multi-thread", "fs", "io-util", "time"] }
+tokio = { version = "=1.51.6", features = ["rt-multi-thread", "fs", "io-util", "time"] }
 tough = { version = "=0.24.0", features = ["http"] }
 tempfile = "=3.23.0"
-url = "=2.5.7"
-zstd = { version = "=0.13.3", default-features = false }
+url = "=2.5.9"
+zstd = { version = "=0.13.4", default-features = false }
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "=0.29.0", default-features = false, features = ["process"] }
-rustix = { version = "=1.1.3", features = ["fs", "process"] }
+rustix = { version = "=1.1.6", features = ["fs", "process"] }
 
 [dev-dependencies]
 aws-lc-rs = "=1.18.1"

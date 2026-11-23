@@ -259,7 +259,12 @@ fn bundle_archive(version: &str, manifest: &Value) -> Vec<u8> {
         0o644,
         tar::EntryType::Regular,
     );
-    for name in ["qleisli", "qargo", "qlippy", "qlifmt", "qlidoc"] {
+    let tools = if manifest["schema"] == 2 {
+        ["qleisli", "qlirgo", "qlinties", "qlifmt", "qlidoc"]
+    } else {
+        ["qleisli", "qargo", "qlippy", "qlifmt", "qlidoc"]
+    };
+    for name in tools {
         append(
             &mut builder,
             &format!("{root}/bin/{name}"),
@@ -286,10 +291,10 @@ fn bundle_archive(version: &str, manifest: &Value) -> Vec<u8> {
             tar::EntryType::Directory,
         );
     }
-    if manifest["verifier"]["kind"] == "external" {
+    if let Some(path) = manifest["verifier"]["path"].as_str() {
         append(
             &mut builder,
-            &format!("{root}/{}", manifest["verifier"]["path"].as_str().unwrap()),
+            &format!("{root}/{path}"),
             b"#!/bin/sh\nexit 0\n",
             0o755,
             tar::EntryType::Regular,
@@ -417,7 +422,9 @@ fn lifecycle_cleanup_reclaims_only_private_staging_and_preserves_committed_state
     }
     let bootstrap = home.join(private[4]).join("bin");
     fs::create_dir(&bootstrap).unwrap();
-    for name in ["qli", "qleisli", "qargo", "qlippy", "qlifmt", "qlidoc"] {
+    for name in [
+        "qli", "qleisli", "qargo", "qlippy", "qlifmt", "qlidoc", "qlirgo", "qlinties",
+    ] {
         symlink("qleisliup", bootstrap.join(name)).unwrap();
     }
     write(&home.join(".qleisliup-manager-not-owned/sentinel"), b"keep");
@@ -564,7 +571,7 @@ fn authenticated_install_receipt_offline_reuse_and_inspection() {
         &fixture.home.identities().unwrap(),
     )
     .unwrap();
-    let text = crate::selection::show(&toolchain, &crate::selection::Source::CommandLine);
+    let text = crate::selection::show(&toolchain, &crate::selection::Source::CommandLine).unwrap();
     assert!(text.contains("qargo checker Qleisli: 0.3.0"));
     assert!(text.contains("not revalidated"));
     assert!(toolchain.root.join(".qleisliup-receipt.json").is_file());
@@ -586,6 +593,83 @@ fn authenticated_install_receipt_offline_reuse_and_inspection() {
         "global default",
     );
     assert!(fixture.final_path("0.4.0").is_dir());
+}
+
+fn qlirgo_manifest(manifest: &mut Value) {
+    let fields = manifest.as_object_mut().unwrap();
+    fields.remove("qargo");
+    fields.remove("qargo_checker_qleisli");
+    manifest["schema"] = json!(2);
+    manifest["qlirgo"] = json!("0.2.0");
+    manifest["qlirgo_checker_qleisli"] = json!("0.3.0");
+    manifest["verifier"] = json!({"kind":"qleisli-kernel","path":"bin/qleisli-kernel"});
+}
+
+#[test]
+fn signed_qlirgo_release_binds_the_tool_suite_and_kernel_offline() {
+    let mut fixture = Fixture::new();
+    fixture.bundle("0.3.0", Some(qlirgo_manifest));
+    fixture.publish(2, FUTURE, FUTURE, true);
+    let version = fixture.install("0.3.0").unwrap();
+    let open = || {
+        Toolchain::release(
+            &fixture.home,
+            &version,
+            HOST,
+            &fixture.home.identities().unwrap(),
+        )
+    };
+    let toolchain = open().unwrap();
+    let text = crate::selection::show(&toolchain, &crate::selection::Source::CommandLine).unwrap();
+    assert!(text.contains("qlirgo: 0.2.0\nqlirgo checker Qleisli: 0.3.0\n"));
+    assert!(text.contains("verifier: Qleisli native kernel, bin/qleisli-kernel"));
+    assert_eq!(
+        toolchain.native_kernel(),
+        Some(toolchain.root.join("bin/qleisli-kernel"))
+    );
+    toolchain.executable("qlirgo").unwrap();
+    toolchain.executable("qlinties").unwrap();
+    rejected(toolchain.executable("qargo"), "does not provide qargo");
+
+    let requests = fixture.requests.load(Ordering::Relaxed);
+    install(&fixture.home, &Selector::parse("0.3.0").unwrap(), HOST).unwrap();
+    assert_eq!(fixture.requests.load(Ordering::Relaxed), requests);
+
+    let receipt_path = toolchain.root.join(crate::toolchain::RECEIPT);
+    let receipt: Value = required_json(&receipt_path).unwrap();
+    assert_eq!(receipt["schema"], 2);
+    assert!(receipt.get("qargo").is_none());
+    let mut changed = receipt.clone();
+    changed["qlirgo_checker_qleisli"] = json!("0.2.1");
+    write(&receipt_path, &serde_json::to_vec(&changed).unwrap());
+    rejected(open(), "receipt does not match");
+    write(&receipt_path, &serde_json::to_vec(&receipt).unwrap());
+    fs::remove_file(toolchain.native_kernel().unwrap()).unwrap();
+    rejected(open(), "qleisli-kernel");
+}
+
+#[test]
+fn signed_releases_reject_mixed_schema_fields_before_publication() {
+    let mut fixture = Fixture::new();
+    fixture.bundle(
+        "0.3.0",
+        Some(|manifest| {
+            qlirgo_manifest(manifest);
+            manifest["qargo"] = json!("0.1.9");
+        }),
+    );
+    fixture.bundle(
+        "0.3.1",
+        Some(|manifest| {
+            manifest["qlirgo"] = Value::Null;
+        }),
+    );
+    fixture.publish(2, FUTURE, FUTURE, true);
+    rejected(fixture.install("0.3.0"), "tool suite fields do not match");
+    rejected(fixture.install("0.3.1"), "expected a string");
+    assert!(!fixture.final_path("0.3.0").exists());
+    assert!(!fixture.final_path("0.3.1").exists());
+    assert!(fixture.home.identities().unwrap().is_empty());
 }
 
 #[test]

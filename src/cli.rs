@@ -34,7 +34,7 @@ Usage:
 Selectors: exact SemVer, stable (cached authenticated observation), or a local name.
 Selection: +selector > QLEISLIUP_TOOLCHAIN > nearest declaration > global default.
 which defaults to qleisli; qli is its alias. Inspection never runs a tool.
-Proxy names: qli, qleisli, qargo, qlippy, qlifmt, qlidoc (symlinks to this manager).
+Proxy names: qli, qleisli, qlirgo, qlinties, qlifmt, qlidoc, qargo, qlippy.
 Proxies accept a leading +selector and exec the absolute selected tool offline.
 Links are local and unauthenticated; missing tools never fall back to PATH.
 qleisliup-init installs the manager and proxies; shell configuration is unchanged.
@@ -97,9 +97,9 @@ fn parse(mut args: &[OsString]) -> Result<Command> {
             let tool = tool
                 .to_str()
                 .ok_or_else(|| Error::usage("tool name must be UTF-8"))?;
-            if tool != "qli" && !crate::toolchain::TOOLS.contains(&tool) {
+            if !crate::toolchain::proxy_name(tool) {
                 return Err(Error::usage(
-                    "unknown tool; expected qli, qleisli, qargo, qlippy, qlifmt, or qlidoc",
+                    "unknown tool; expected qli, qleisli, qlirgo, qlinties, qlifmt, qlidoc, qargo, or qlippy",
                 ));
             }
             Ok(Command::Which(leading, tool.to_owned()))
@@ -244,6 +244,6 @@ fn inspect(leading: Option<&Selector>, tool: Option<&str>) -> Result<String> {
     let toolchain = selection::resolve(&home, &request, current_host()?)?;
     match tool {
         Some(tool) => Ok(format!("{}\n", toolchain.executable(tool)?.display())),
-        None => Ok(selection::show(&toolchain, &request.source)),
+        None => selection::show(&toolchain, &request.source),
     }
 }

@@ -5,7 +5,9 @@ use std::os::unix::fs::{MetadataExt, symlink};
 use std::process::Command;
 use std::sync::{Mutex, OnceLock};
 
-const PROXIES: [&str; 6] = ["qli", "qleisli", "qargo", "qlippy", "qlifmt", "qlidoc"];
+const PROXIES: [&str; 8] = [
+    "qli", "qleisli", "qargo", "qlippy", "qlifmt", "qlidoc", "qlirgo", "qlinties",
+];
 type NativeCache = BTreeMap<(String, String), Vec<u8>>;
 static NATIVE: OnceLock<Mutex<NativeCache>> = OnceLock::new();
 
@@ -256,7 +258,7 @@ fn self_update_rejects_shared_writable_owned_bin_before_network_access() {
 }
 
 #[test]
-fn bootstrap_publishes_a_complete_manager_and_six_relative_proxies_only() {
+fn bootstrap_publishes_a_complete_manager_and_both_proxy_families() {
     let mut fixture = Fixture::new();
     let shell = fixture.home.path.parent().unwrap().join("shell.rc");
     write(&shell, b"untouched shell settings");
@@ -285,6 +287,24 @@ fn bootstrap_publishes_a_complete_manager_and_six_relative_proxies_only() {
     assert!(fixture.home.identities().unwrap().is_empty());
     assert_eq!(fixture.home.manager_identities().unwrap().len(), 1);
     assert_eq!(fs::read(shell).unwrap(), b"untouched shell settings");
+}
+
+#[test]
+fn self_update_accepts_legacy_ownership_and_preserves_its_proxy_layout() {
+    let mut fixture = bootstrapped();
+    let bin = fixture.home.path.join("bin");
+    let marker = bin.join(".qleisliup-managed.json");
+    let ownership =
+        serde_json::to_vec(&json!({"schema":1,"host":host(),"authenticated":true})).unwrap();
+    write(&marker, &ownership);
+    for tool in ["qlirgo", "qlinties"] {
+        fs::remove_file(bin.join(tool)).unwrap();
+    }
+    refresh(&mut fixture, "0.1.1", 2);
+    apply(&fixture, update_mode(&fixture, "0.1.0")).unwrap();
+    assert_eq!(fs::read(marker).unwrap(), ownership);
+    assert!(!bin.join("qlirgo").exists());
+    assert!(!bin.join("qlinties").exists());
 }
 
 #[test]

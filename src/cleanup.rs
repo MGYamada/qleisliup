@@ -199,17 +199,9 @@ mod unix {
                 FileType::Symlink
                     if proxies
                         && relative.parent() == Some(Path::new("bin"))
-                        && [
-                            b"qli".as_slice(),
-                            b"qleisli",
-                            b"qargo",
-                            b"qlippy",
-                            b"qlifmt",
-                            b"qlidoc",
-                        ]
-                        .contains(&name.to_bytes()) =>
+                        && name.to_str().is_ok_and(crate::toolchain::proxy_name) =>
                 {
-                    // Interrupted bootstrap legitimately contains these six links.
+                    // Interrupted bootstrap may contain these proxy links.
                     // Accept their exact relative target, then unlink without following.
                     let target = readlinkat(&directory.file, name, Vec::new())
                         .map_err(|e| Error::file(&path, e))?;

@@ -2,6 +2,22 @@
 
 Product versions are independent of distribution and state schema versions.
 
+## 0.1.6 - 2026-11-23
+
+- Align the README disclaimer with qlirgo 0.2.0 by naming qlirgo and qlinties
+  in the non-affiliation notice.
+- Update the Cargo package, both executables, and current documentation to 0.1.6.
+- Update the locked rustls dependency to 0.23.46 to address RUSTSEC-2026-0346
+  through RUSTSEC-2026-0349.
+- Update `tar` to 0.4.46 to address GHSA-3pv8-6f4r-ffg2.
+- Update `rustix`, `tokio`, `url`, the `zstd` stack, `rustls-webpki`, and
+  `webpki-root-certs` to address RustSec findings on Rust 1.85.
+- Update `futures-util` to 0.3.32, removing the unmaintained `pin-utils`
+  dependency (RUSTSEC-2026-0441).
+- Support the Qleisli 0.3.0 and qlirgo 0.2.0 toolchain pair with schema 2
+  manifests and receipts, `qlirgo` and `qlinties` proxies, and native kernel
+  selection. Existing schema 1 releases and bootstrap layouts remain usable.
+
 ## 0.1.5 - 2026-10-11
 
 - Expand README's independence notice to include qleisliup and qleisliup-init,

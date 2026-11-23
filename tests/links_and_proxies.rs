@@ -15,7 +15,9 @@ use std::sync::OnceLock;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
-const TOOLS: [&str; 6] = ["qli", "qleisli", "qargo", "qlippy", "qlifmt", "qlidoc"];
+const TOOLS: [&str; 8] = [
+    "qli", "qleisli", "qargo", "qlippy", "qlifmt", "qlidoc", "qlirgo", "qlinties",
+];
 static NATIVE: OnceLock<(TempDir, PathBuf)> = OnceLock::new();
 
 fn native() -> &'static Path {
@@ -76,6 +78,8 @@ impl Fixture {
             .env("QLEISLIUP_HOME", &self.home)
             .env("HOME", self.root.join("user"))
             .env_remove("QLEISLIUP_TOOLCHAIN")
+            .env_remove("QLEISLI_KERNEL")
+            .env_remove("QLEISLIUP_DEFAULT_KERNEL")
             .env_remove("QLEISLIUP_FIXTURE_EXIT")
             .env("HTTPS_PROXY", "http://127.0.0.1:1")
             .env("HTTP_PROXY", "http://127.0.0.1:1")
@@ -531,7 +535,7 @@ fn concurrent_registrations_and_unlinks_preserve_independent_names() {
 }
 
 #[test]
-fn all_six_proxy_names_execute_their_selected_absolute_tool() {
+fn all_proxy_names_execute_their_selected_absolute_tool() {
     let fixture = Fixture::new();
     let build = fixture.build("bundle", true);
     fixture.link("dev", &build);
@@ -554,6 +558,72 @@ fn all_six_proxy_names_execute_their_selected_absolute_tool() {
         state_before
     );
     assert!(!fixture.home.join("settings.json").exists());
+}
+
+#[test]
+fn qlirgo_proxies_use_the_selected_kernel_and_preserve_explicit_overrides() {
+    let fixture = Fixture::new();
+    let release = fixture.release("0.4.0");
+    let mut manifest = read_json(&release.join("toolchain.json"));
+    manifest.as_object_mut().unwrap().remove("qargo");
+    manifest
+        .as_object_mut()
+        .unwrap()
+        .remove("qargo_checker_qleisli");
+    manifest["schema"] = json!(2);
+    manifest["qleisli"] = json!("0.3.0");
+    manifest["std"] = json!("0.3.0");
+    manifest["qlirgo"] = json!("0.2.0");
+    manifest["qlirgo_checker_qleisli"] = json!("0.3.0");
+    manifest["verifier"] = json!({"kind":"qleisli-kernel","path":"bin/qleisli-kernel"});
+    let first = fixture.build("first", true);
+    let second = fixture.build("second", true);
+    for (name, build) in [("first", &first), ("second", &second)] {
+        write_json(&build.join("toolchain.json"), &manifest);
+        fs::copy(native(), build.join("bin/qleisli-kernel")).unwrap();
+        fixture.link(name, build);
+    }
+    let legacy = fixture.build("legacy", false);
+    fixture.link("legacy", &legacy);
+
+    let inspection = fixture.run(&["+first", "which", "qlinties"]);
+    passed(&inspection);
+    assert_eq!(
+        text(&inspection).trim_end(),
+        first.join("bin/qlinties").to_str().unwrap()
+    );
+    let output = fixture.proxy("qlirgo").arg("+first").output().unwrap();
+    passed(&output);
+    field(
+        &output,
+        "QLEISLI_KERNEL",
+        first.join("bin/qleisli-kernel").as_os_str(),
+    );
+
+    for (tool, selector, expected) in [
+        ("qlinties", "+second", second.join("bin/qleisli-kernel")),
+        ("qli", "+legacy", PathBuf::new()),
+    ] {
+        let output = fixture
+            .proxy("qlirgo")
+            .args(["+first", "__nested"])
+            .env("QLEISLIUP_FIXTURE_PROXY", fixture.proxies.join(tool))
+            .env("QLEISLIUP_FIXTURE_SELECTOR", selector)
+            .output()
+            .unwrap();
+        passed(&output);
+        field(&output, "QLEISLI_KERNEL", expected.as_os_str());
+    }
+    let output = fixture
+        .proxy("qlirgo")
+        .args(["+first", "__nested"])
+        .env("QLEISLIUP_FIXTURE_PROXY", fixture.proxies.join("qlinties"))
+        .env("QLEISLIUP_FIXTURE_SELECTOR", "+second")
+        .env("QLEISLI_KERNEL", "/explicit/kernel")
+        .output()
+        .unwrap();
+    passed(&output);
+    field(&output, "QLEISLI_KERNEL", OsStr::new("/explicit/kernel"));
 }
 
 #[test]

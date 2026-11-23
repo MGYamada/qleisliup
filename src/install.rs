@@ -11,7 +11,7 @@ use crate::error::{Error, Result};
 use crate::files;
 use crate::identity::{ExactVersion, HOSTS, Selector};
 use crate::state::{ArtifactIdentity, DefaultValue, Home, required_json};
-use crate::toolchain::{Manifest, StdKind, Toolchain, Verifier};
+use crate::toolchain::{Manifest, StdKind, Toolchain, Verifier, present_string};
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -20,8 +20,14 @@ struct Release {
     qleisli: String,
     std: String,
     std_kind: StdKind,
-    qargo: String,
-    qargo_checker_qleisli: String,
+    #[serde(default, deserialize_with = "present_string")]
+    qargo: Option<String>,
+    #[serde(default, deserialize_with = "present_string")]
+    qargo_checker_qleisli: Option<String>,
+    #[serde(default, deserialize_with = "present_string")]
+    qlirgo: Option<String>,
+    #[serde(default, deserialize_with = "present_string")]
+    qlirgo_checker_qleisli: Option<String>,
     verifier: Verifier,
     compiler_commit: String,
     verifier_commit: String,
@@ -209,6 +215,8 @@ impl Release {
             std_kind: self.std_kind.clone(),
             qargo: self.qargo.clone(),
             qargo_checker_qleisli: self.qargo_checker_qleisli.clone(),
+            qlirgo: self.qlirgo.clone(),
+            qlirgo_checker_qleisli: self.qlirgo_checker_qleisli.clone(),
             verifier: self.verifier.clone(),
             compiler_commit: self.compiler_commit.clone(),
             verifier_commit: self.verifier_commit.clone(),

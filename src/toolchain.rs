@@ -1,15 +1,30 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::error::{Error, Result};
 use crate::files;
 use crate::identity::ExactVersion;
-use crate::state::{ArtifactIdentity, Home, read_json, relative_path, required_json, schema};
+use crate::state::{ArtifactIdentity, Home, read_json, relative_path, required_json};
 
-pub(crate) const TOOLS: [&str; 5] = ["qleisli", "qargo", "qlippy", "qlifmt", "qlidoc"];
+pub(crate) const LEGACY_PROXIES: [&str; 6] =
+    ["qli", "qleisli", "qargo", "qlippy", "qlifmt", "qlidoc"];
+pub(crate) const QLIRGO_PROXIES: [&str; 2] = ["qlirgo", "qlinties"];
+const LEGACY_TOOLS: [&str; 5] = ["qleisli", "qargo", "qlippy", "qlifmt", "qlidoc"];
+const QLIRGO_TOOLS: [&str; 5] = ["qleisli", "qlirgo", "qlinties", "qlifmt", "qlidoc"];
 pub(crate) const RECEIPT: &str = ".qleisliup-receipt.json";
+
+pub(crate) fn proxy_name(name: &str) -> bool {
+    LEGACY_PROXIES.contains(&name) || QLIRGO_PROXIES.contains(&name)
+}
+
+// A missing member can belong to the other schema. An explicit null is invalid.
+pub(crate) fn present_string<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<Option<String>, D::Error> {
+    String::deserialize(deserializer).map(Some)
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(tag = "kind", deny_unknown_fields)]
@@ -18,6 +33,17 @@ pub(crate) enum Verifier {
     EmbeddedRust,
     #[serde(rename = "external")]
     External { protocol: u32, path: String },
+    #[serde(rename = "qleisli-kernel")]
+    QleisliKernel { path: String },
+}
+
+impl Verifier {
+    fn path(&self) -> Option<&str> {
+        match self {
+            Self::EmbeddedRust => None,
+            Self::External { path, .. } | Self::QleisliKernel { path } => Some(path),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -27,15 +53,21 @@ pub(crate) enum StdKind {
     Directory,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Manifest {
     pub(crate) schema: u32,
     pub(crate) qleisli: String,
     pub(crate) std: String,
     pub(crate) std_kind: StdKind,
-    pub(crate) qargo: String,
-    pub(crate) qargo_checker_qleisli: String,
+    #[serde(default, deserialize_with = "present_string")]
+    pub(crate) qargo: Option<String>,
+    #[serde(default, deserialize_with = "present_string")]
+    pub(crate) qargo_checker_qleisli: Option<String>,
+    #[serde(default, deserialize_with = "present_string")]
+    pub(crate) qlirgo: Option<String>,
+    #[serde(default, deserialize_with = "present_string")]
+    pub(crate) qlirgo_checker_qleisli: Option<String>,
     pub(crate) verifier: Verifier,
     pub(crate) compiler_commit: String,
     pub(crate) verifier_commit: String,
@@ -43,14 +75,37 @@ pub(crate) struct Manifest {
 }
 
 impl Manifest {
+    pub(crate) fn suite(&self) -> Result<(&'static str, &str, &str)> {
+        match (
+            self.schema,
+            self.qargo.as_deref(),
+            self.qargo_checker_qleisli.as_deref(),
+            self.qlirgo.as_deref(),
+            self.qlirgo_checker_qleisli.as_deref(),
+        ) {
+            (1, Some(version), Some(checker), None, None) => Ok(("qargo", version, checker)),
+            (2, None, None, Some(version), Some(checker)) => Ok(("qlirgo", version, checker)),
+            (1 | 2, ..) => Err(Error::operational(
+                "tool suite fields do not match the manifest schema",
+            )),
+            _ => Err(Error::operational(format!(
+                "unsupported schema {}",
+                self.schema
+            ))),
+        }
+    }
+
+    fn inventory(&self) -> &[&str] {
+        if self.schema == 2 {
+            &QLIRGO_TOOLS
+        } else {
+            &LEGACY_TOOLS
+        }
+    }
+
     pub(crate) fn validate(&self, path: &Path, host: &str) -> Result<()> {
-        schema(self.schema, path)?;
-        for value in [
-            &self.qleisli,
-            &self.std,
-            &self.qargo,
-            &self.qargo_checker_qleisli,
-        ] {
+        let (_, version, checker) = self.suite().map_err(|error| Error::file(path, error))?;
+        for value in [&*self.qleisli, &*self.std, version, checker] {
             ExactVersion::parse(value).map_err(|error| Error::file(path, error))?;
         }
         if self.qleisli != self.std || self.host != host {
@@ -66,17 +121,19 @@ impl Manifest {
                 ));
             }
         }
-        if let Verifier::External {
-            protocol,
-            path: external,
-        } = &self.verifier
-        {
-            if *protocol == 0 {
-                return Err(Error::file(
-                    path,
-                    "external verifier protocol must be positive",
-                ));
-            }
+        if matches!(self.verifier, Verifier::QleisliKernel { .. }) != (self.schema == 2) {
+            return Err(Error::file(
+                path,
+                "verifier kind does not match the manifest schema",
+            ));
+        }
+        if matches!(self.verifier, Verifier::External { protocol: 0, .. }) {
+            return Err(Error::file(
+                path,
+                "external verifier protocol must be positive",
+            ));
+        }
+        if let Some(external) = self.verifier.path() {
             relative_path(external).map_err(|error| Error::file(path, error))?;
         }
         Ok(())
@@ -84,12 +141,14 @@ impl Manifest {
 
     pub(crate) fn write_receipt(&self, root: &Path, identity: &ArtifactIdentity) -> Result<()> {
         let receipt = Receipt {
-            schema: 1,
+            schema: self.schema,
             qleisli: self.qleisli.clone(),
             std: self.std.clone(),
             std_kind: self.std_kind.clone(),
             qargo: self.qargo.clone(),
             qargo_checker_qleisli: self.qargo_checker_qleisli.clone(),
+            qlirgo: self.qlirgo.clone(),
+            qlirgo_checker_qleisli: self.qlirgo_checker_qleisli.clone(),
             host: self.host.clone(),
             verifier: self.verifier.clone(),
             manifest_target: identity.manifest_target.clone(),
@@ -112,8 +171,30 @@ struct Receipt {
     qleisli: String,
     std: String,
     std_kind: StdKind,
-    qargo: String,
-    qargo_checker_qleisli: String,
+    #[serde(
+        default,
+        deserialize_with = "present_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    qargo: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "present_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    qargo_checker_qleisli: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "present_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    qlirgo: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "present_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    qlirgo_checker_qleisli: Option<String>,
     host: String,
     verifier: Verifier,
     manifest_target: String,
@@ -177,13 +258,15 @@ impl Toolchain {
         }
         let receipt_path = root.join(RECEIPT);
         let receipt: Receipt = required_json(&receipt_path)?;
-        schema(receipt.schema, &receipt_path)?;
         if !receipt.authenticated
+            || receipt.schema != manifest.schema
             || receipt.qleisli != manifest.qleisli
             || receipt.std != manifest.std
             || receipt.std_kind != manifest.std_kind
             || receipt.qargo != manifest.qargo
             || receipt.qargo_checker_qleisli != manifest.qargo_checker_qleisli
+            || receipt.qlirgo != manifest.qlirgo
+            || receipt.qlirgo_checker_qleisli != manifest.qlirgo_checker_qleisli
             || receipt.host != manifest.host
             || receipt.verifier != manifest.verifier
         {
@@ -206,7 +289,7 @@ impl Toolchain {
             ));
         }
         files::managed_directory(&root.join("bin"))?;
-        for tool in TOOLS {
+        for tool in manifest.inventory() {
             files::regular(&root.join("bin").join(tool), true)?;
         }
         for file in ["LICENSE", "NOTICE"] {
@@ -265,9 +348,17 @@ impl Toolchain {
 
     pub(crate) fn executable(&self, tool: &str) -> Result<PathBuf> {
         let tool = if tool == "qli" { "qleisli" } else { tool };
-        if !TOOLS.contains(&tool) {
-            return Err(Error::usage(format!(
-                "unknown tool {tool:?}; expected qli, qleisli, qargo, qlippy, qlifmt, or qlidoc"
+        if !proxy_name(tool) {
+            return Err(Error::usage(format!("unknown tool {tool:?}")));
+        }
+        if !self.linked
+            && self
+                .manifest
+                .as_ref()
+                .is_some_and(|manifest| !manifest.inventory().contains(&tool))
+        {
+            return Err(Error::operational(format!(
+                "selected release does not provide {tool}"
             )));
         }
         let path = self.root.join("bin").join(tool);
@@ -281,10 +372,17 @@ impl Toolchain {
         path.canonicalize()
             .map_err(|error| Error::file(&path, error))
     }
+
+    pub(crate) fn native_kernel(&self) -> Option<PathBuf> {
+        match &self.manifest.as_ref()?.verifier {
+            Verifier::QleisliKernel { path } => Some(self.root.join(path)),
+            _ => None,
+        }
+    }
 }
 
 fn validate_external(root: &Path, manifest: &Manifest, linked: bool) -> Result<()> {
-    if let Verifier::External { path, .. } = &manifest.verifier {
+    if let Some(path) = manifest.verifier.path() {
         let relative = relative_path(path)?;
         let mut parent = root.to_path_buf();
         if let Some(directories) = relative.parent() {
@@ -297,7 +395,11 @@ fn validate_external(root: &Path, manifest: &Manifest, linked: bool) -> Result<(
                 }
             }
         }
-        files::regular(&root.join(relative), true)?;
+        let executable = root.join(relative);
+        files::regular(&executable, true)?;
+        if matches!(manifest.verifier, Verifier::QleisliKernel { .. }) {
+            files::not_manager(&executable)?;
+        }
     }
     Ok(())
 }

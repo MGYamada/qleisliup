@@ -45,6 +45,9 @@ fn main() {
         if let Some(cwd) = std::env::var_os("QLEISLIUP_FIXTURE_CWD") {
             child.current_dir(cwd);
         }
+        if let Some(selector) = std::env::var_os("QLEISLIUP_FIXTURE_SELECTOR") {
+            child.arg(selector);
+        }
         let output = child.arg("nested argument").output().unwrap();
         std::io::stdout().write_all(&output.stdout).unwrap();
         std::io::stderr().write_all(&output.stderr).unwrap();
@@ -53,7 +56,12 @@ fn main() {
     println!("pid:{}", std::process::id());
     show("argv0", &args[0]);
     show("cwd", std::env::current_dir().unwrap().as_os_str());
-    for name in ["QLEISLIUP_TOOLCHAIN", "QLEISLIUP_HOME", "PATH"] {
+    for name in [
+        "QLEISLIUP_TOOLCHAIN",
+        "QLEISLIUP_HOME",
+        "PATH",
+        "QLEISLI_KERNEL",
+    ] {
         show(name, &std::env::var_os(name).unwrap_or_default());
     }
     for arg in &args[1..] {

@@ -18,17 +18,17 @@ use crate::distribution::{self, Client, Source};
 use crate::error::{Error, Result};
 use crate::identity::{ExactVersion, HOSTS, current_host};
 use crate::state::{ArtifactIdentity, Home, check_manager_identity, required_json};
+use crate::toolchain::{LEGACY_PROXIES, QLIRGO_PROXIES};
 use crate::{files, state};
 
 const MANAGER_LIMIT: u64 = 128 * 1024 * 1024;
-const PROXIES: [&str; 6] = ["qli", "qleisli", "qargo", "qlippy", "qlifmt", "qlidoc"];
 const MARKER: &str = ".qleisliup-managed.json";
 #[cfg(all(test, unix))]
 mod tests;
 const INIT_HELP: &str = "qleisliup-init - authenticated manager bootstrap
 
 Usage:
-  qleisliup-init                 Install the manager and six proxy symlinks
+  qleisliup-init                 Install the manager and proxy symlinks
   qleisliup-init --help | -h
   qleisliup-init --version | -V
 
@@ -191,11 +191,19 @@ fn owned(
         return Err(rejected());
     }
     let marker: Ownership = required_json(&bin.join(MARKER)).map_err(|_| rejected())?;
-    state::schema(marker.schema, &bin.join(MARKER))?;
     if marker.host != host || !marker.authenticated {
         return Err(rejected());
     }
-    check_proxies(&bin)?;
+    if !matches!(marker.schema, 1 | 2) {
+        return Err(Error::file(
+            &bin.join(MARKER),
+            format!("unsupported schema {}", marker.schema),
+        ));
+    }
+    check_proxies(&bin, &LEGACY_PROXIES)?;
+    if marker.schema == 2 {
+        check_proxies(&bin, &QLIRGO_PROXIES)?;
+    }
     let identity = home
         .manager_identities()?
         .remove(&format!("{version}-{host}"))
@@ -209,8 +217,8 @@ fn owned(
     Ok(identity)
 }
 
-fn check_proxies(bin: &Path) -> Result<()> {
-    for proxy in PROXIES {
+fn check_proxies(bin: &Path, proxies: &[&str]) -> Result<()> {
+    for proxy in proxies {
         let path = bin.join(proxy);
         if fs::read_link(&path).map_err(|e| Error::file(&path, e))? != Path::new("qleisliup") {
             return Err(Error::file(
@@ -331,7 +339,7 @@ async fn transaction<T: Transport + Clone + 'static>(
     if let Mode::Bootstrap = mode {
         make_proxies(&staged_bin)?;
         let marker = Ownership {
-            schema: 1,
+            schema: 2,
             host: host.into(),
             authenticated: true,
         };
@@ -365,7 +373,7 @@ async fn transaction<T: Transport + Clone + 'static>(
 
 #[cfg(unix)]
 fn make_proxies(bin: &Path) -> Result<()> {
-    for proxy in PROXIES {
+    for proxy in LEGACY_PROXIES.into_iter().chain(QLIRGO_PROXIES) {
         std::os::unix::fs::symlink("qleisliup", bin.join(proxy))
             .map_err(|e| Error::file(&bin.join(proxy), e))?;
     }
