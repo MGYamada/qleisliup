@@ -2,7 +2,7 @@
 
 Qleisli toolchain lifecycle management.
 
-**Qleisli and its tools (qargo, qlippy, qlifmt, qlidoc, qleisliup, and qleisliup-init) are independent projects and are not affiliated with, endorsed by, or sponsored by the Rust Project or the Rust Foundation.**
+**Qleisli and its tools (qlirgo, qlinties, qlifmt, qlidoc, qleisliup, and qleisliup-init) are independent projects and are not affiliated with, endorsed by, or sponsored by the Rust Project or the Rust Foundation.**
 
 **Rust and Cargo are trademarks of the Rust Foundation.**
 
@@ -19,8 +19,11 @@ Python connections use separately distributed wheels and project-local uv
 environments. See the [environment boundary](docs/environment-dependencies.md)
 for ownership, exact dependency records, and pending upstream acceptance work.
 
+Local toolchains support the Qleisli 0.3.0 and qlirgo 0.2.0 release pair,
+including the native Qleisli kernel. See the [local toolchain setup](docs/source-installation.md#use-the-formal-release-pair).
+
 ## Current status
 
 The maintainer has decided to temporarily suspend qleisliup development
 to focus on developing Qleisli itself. qleisliup is therefore on hold
-at version **0.1.5**.
+at version **0.1.6**.

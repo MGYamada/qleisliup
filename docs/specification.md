@@ -1,8 +1,8 @@
-# qleisliup 0.1.5 specification
+# qleisliup 0.1.6 specification
 
 ## Status and responsibility
 
-Development is temporarily suspended at version 0.1.5 while the maintainer
+Development is temporarily suspended at version 0.1.6 while the maintainer
 focuses on developing Qleisli itself.
 
 This is the adopted design contract for the first operational manager. **Stages
@@ -11,12 +11,12 @@ links, Unix proxies, TUF authentication, transactional installation/removal,
 bootstrap, and manager self-update.**
 Production distribution endpoints and the initial trusted root are unconfigured;
 new installs, bootstrap, and manager refreshes fail closed.
-Version 0.1.5 contains both executables in one source package for crates.io.
+Version 0.1.6 contains both executables in one source package for crates.io.
 Cargo installation does not create proxies or bootstrap ownership. Registry
 publication does not configure or authenticate production toolchain distribution.
-Examples describe formats and
-interfaces; Qleisli 0.4.0 and qargo 0.2.1 are illustrative distribution versions,
-not announcements of published or compatible artifacts.
+The toolchain format supports the Qleisli 0.3.0 and qlirgo 0.2.0 release pair.
+Upstream publishes these components separately. qleisliup distribution and
+production trust remain pending.
 
 qleisliup manages the installation, selection, inspection, and removal of Qleisli
 toolchains. It authenticates distribution bytes and manages its own executable.
@@ -27,7 +27,7 @@ or certify compiler transformations, verifier correctness, or mathematical proof
 | --- | --- |
 | Qleisli | Language implementation, stdlib, and verification authority |
 | qleisliup | Toolchain lifecycle and authenticated distribution |
-| qargo | Qrate lifecycle and its own checking/tool orchestration |
+| qlirgo | Qrate lifecycle and its own checking/tool orchestration |
 | qrate | Qleisli package unit |
 
 The end-user distribution goal is native bootstrap and prebuilt toolchains on
@@ -41,12 +41,11 @@ remaining native artifact and production trust work separately from implemented
 manager operations.
 
 Separate repositories and product versions permit a jointly tested distribution.
-qargo does not link a qleisliup library. Its present implementation links Qleisli
-0.2.1 directly; it does not dispatch ordinary checking to a PATH compiler.
-Bundling or proxying qargo does not migrate that acceptance authority. A future
-external-checker protocol belongs to the upstream projects and is outside this
-work. A compiler identity command such as `qli version --json` is an upstream
-proposal, not an interface supplied by qleisliup.
+Qlirgo 0.2.0 links the Qleisli 0.3.0 frontend and embedded stdlib. Nonempty
+checking uses the compatible native Qleisli kernel. The selected standalone
+compiler is a separate executable. The manager supplies the kernel path from
+the selected toolchain and leaves acceptance to Qleisli. Schema 1 continues to
+describe existing qargo bundles and their linked checker.
 
 Components, profiles, cross-target installation, persistent directory overrides,
 beta/nightly channels, a registry, and automatic package resolution are excluded.
@@ -72,7 +71,7 @@ interface. Actual compatible bundles and Python sample/CI delivery remain
 upstream acceptance work, not implemented manager features.
 
 qleisliup adds no Rust/Lean/Python installer, package resolver, language proxy,
-cross-language lockfile, or qargo integration library. Selected tools retain
+cross-language lockfile, or qlirgo integration library. Selected tools retain
 their own contracts; the proxy does not sandbox arbitrary local toolchains or
 rewrite their environment beyond the documented selection/PATH propagation.
 See [environment dependencies](environment-dependencies.md) for the adopted
@@ -91,8 +90,9 @@ private core, without a public Rust library. Cargo run defaults to qleisliup.
 Bootstrap accepts no arguments to install, or an isolated help/version flag.
 Its executable identity is selected by the Cargo binary name, so renaming it
 does not turn it into a manager/proxy.
-Invoking a symlink named qli/qleisli/qargo/qlippy/qlifmt/qlidoc dispatches that
-tool, including its help/version flags, through the selected toolchain.
+Invoking a symlink named `qli`, `qleisli`, `qlirgo`, `qlinties`, `qlifmt`,
+`qlidoc`, `qargo`, or `qlippy` dispatches that tool, including its help/version
+flags, through the selected toolchain.
 
 Success is exit status 0; operational failures use 1; invalid CLI syntax and
 unsupported arguments use 2. Diagnostics go to stderr. Stable selection
@@ -109,7 +109,7 @@ means a complete `MAJOR.MINOR.PATCH`, optionally with valid prerelease and build
 metadata. Ranges, shortened versions, a `v` prefix, and surrounding whitespace
 are invalid. Build metadata remains part of the identity even though SemVer
 precedence ignores it. Qleisli and stdlib must have identical version strings.
-qargo has an independent exact version fixed by the distribution.
+Qlirgo and legacy qargo each have an independent exact version fixed by the distribution.
 
 The user-maintained declaration is `qleisli-toolchain.toml`:
 
@@ -158,8 +158,9 @@ the link. With no selection, ask for an explicit `default` operation.
 `which qli` and `which qleisli` print the same selected `bin/qleisli` path.
 Process dispatch is implemented on the three supported Unix hosts.
 
-`qli` and `qleisli` map to the selected `bin/qleisli`. The other proxies are
-`qargo`, `qlippy`, `qlifmt`, and `qlidoc`, each mapped to the same-named file.
+`qli` and `qleisli` map to the selected `bin/qleisli`. Schema 2 releases supply
+`qlirgo`, `qlinties`, `qlifmt`, and `qlidoc`. Schema 1 releases supply
+`qargo`, `qlippy`, `qlifmt`, and `qlidoc`. These names map to same-named files.
 Development proxy entry points are symlinks to the manager; dispatch recognizes
 the invoked name from argv[0], rather than the manager's canonical executable filename.
 Stage 4 bootstrap creates these entry points in the managed bin directory.
@@ -180,6 +181,13 @@ selected bin; an unset PATH becomes that bin alone. A bin path containing `:`
 cannot be represented in Unix PATH and fails before execution. Signal masks and
 ignored dispositions follow execve inheritance; the selected tool's runtime
 installs its own handlers. No advisory mutation lock is acquired during dispatch.
+
+The proxy supplies a schema 2 toolchain's absolute native kernel path in
+`QLEISLI_KERNEL` when the caller has left that variable unset. An explicit
+value is preserved. The proxy records its own injected value in
+`QLEISLIUP_DEFAULT_KERNEL`. A nested proxy treats a matching inherited value as
+a proxy default and recomputes it for the new selection. An upstream
+command-line kernel option keeps its existing precedence.
 
 Inspection and ordinary execution are offline. Expired remote metadata does
 not prevent execution of an already installed toolchain. Upstream runtime
@@ -208,10 +216,11 @@ operation invokes Cargo or builds a toolchain.
 | `self update` | Authenticate and replace only a bootstrap-owned qleisliup executable. Never change toolchain contents, pins, or the default. Reject external installations, downgrades, and changed remembered identities. |
 
 `show` identifies the selection source as command line, environment, repository
-declaration (with its path), or global default. It displays Qleisli/std/qargo
-versions and qargo's linked checker version separately. A verifier is displayed
-as embedded Rust or an external backend with its actual protocol. Do not invent
-a protocol number for the embedded verifier. Release authentication is described
+declaration (with its path), or global default. It displays the Qleisli and std
+versions, the qrate tool suite version, and its linked Qleisli version separately.
+The verifier is displayed as a Qleisli native kernel with its path, embedded
+Rust, or a legacy external backend with its protocol and path.
+Release authentication is described
 as an installation-time fact; a link is `linked / local / unauthenticated`.
 Machine-readable inspection schemas are deferred; upstream tools do not depend
 on the human-readable output.
@@ -241,8 +250,8 @@ requires an existing name, removes only its record, and also works after the
 build directory has moved or disappeared. Neither operation changes the default
 or a repository pin.
 
-The canonical linked root must contain executable `bin/qleisli`. qargo, its
-auxiliary tools, and an internal manifest are optional. Missing requested tools
+The canonical linked root must contain executable `bin/qleisli`. The qrate tool
+suite, its auxiliary tools, and an internal manifest are optional. Missing requested tools
 fail without borrowing them from a release or PATH. A link without an internal
 manifest has unknown component versions. A supplied manifest must be valid but
 cannot confer release authentication. A manifest declaring a directory stdlib
@@ -270,7 +279,7 @@ proxy symlinks may live separately, such as in ignored build output.
 <home>/
   .mutation-lock
   bin/qleisliup
-  bin/{qli,qleisli,qargo,qlippy,qlifmt,qlidoc} -> qleisliup
+  bin/{qli,qleisli,qlirgo,qlinties,qlifmt,qlidoc,qargo,qlippy} -> qleisliup
   bin/.qleisliup-managed.json    immutable bootstrap ownership marker
   bin/.qleisliup-manager-*/      private update staging, when present
   .qleisliup-manager-*/          private bootstrap staging, when present
@@ -362,22 +371,22 @@ Versioned targets are fixed under `releases/<version>/`; only channel targets
 are mutable. Artifacts use tar.zst and include one `<version>-<host>/` root.
 Artifacts refer to TUF target names, not arbitrary download URLs.
 
-Illustrative release manifest:
+Example schema 2 release manifest for Qleisli 0.3.0 and qlirgo 0.2.0:
 
 ```json
 {
-  "schema": 1,
-  "qleisli": "0.4.0",
-  "std": "0.4.0",
+  "schema": 2,
+  "qleisli": "0.3.0",
+  "std": "0.3.0",
   "std_kind": "embedded",
-  "qargo": "0.2.1",
-  "qargo_checker_qleisli": "0.4.0",
-  "verifier": {"kind": "embedded-rust"},
+  "qlirgo": "0.2.0",
+  "qlirgo_checker_qleisli": "0.3.0",
+  "verifier": {"kind": "qleisli-kernel", "path": "bin/qleisli-kernel"},
   "compiler_commit": "<full upstream commit ID>",
   "verifier_commit": "<full upstream commit ID>",
   "artifacts": {
     "aarch64-apple-darwin": {
-      "target": "releases/0.4.0/aarch64-apple-darwin.tar.zst",
+      "target": "releases/0.3.0/aarch64-apple-darwin.tar.zst",
       "sha256": "<64 lowercase hexadecimal digits>",
       "size": 12345678
     }
@@ -385,24 +394,27 @@ Illustrative release manifest:
 }
 ```
 
-The example's qargo checker version is illustrative. A bundle containing the
-current qargo 0.1.5 must instead declare its actual linked Qleisli 0.2.1 checker,
-even if its standalone compiler has another version. All four qargo executables
-share the distribution's qargo version.
+The schema 2 checker field records the actual Qleisli frontend linked into the
+qlirgo tools. The kernel is an executable using Qleisli's native QIRF interface.
+The four bundled qlirgo tools share one product version. Schema 1 uses `qargo`
+and `qargo_checker_qleisli` in place of the schema 2 qlirgo fields.
 
 The archive's `toolchain.json` carries the same schema and component identity
 fields as the release manifest, plus its exact `host`, excluding `artifacts`.
 Validation binds it to the requested version, selected host, release manifest,
-and authenticated artifact identity. The required inventory is `bin/qleisli`,
-`bin/qargo`, `bin/qlippy`, `bin/qlifmt`, `bin/qlidoc`, `toolchain.json`, `LICENSE`,
-and `NOTICE`. The compiler and four qargo tools must be executable regular files.
-No compiler version-reporting command is assumed by the installer.
+and authenticated artifact identity. Both schemas require `bin/qleisli`,
+`bin/qlifmt`, `bin/qlidoc`, `toolchain.json`, `LICENSE`, and `NOTICE`. Schema 2
+also requires `bin/qlirgo`, `bin/qlinties`, and its declared native kernel.
+Schema 1 requires `bin/qargo` and `bin/qlippy` alongside the shared inventory.
+Every declared executable must be a regular file with execute permissions.
+The installer reads identities from the authenticated manifests.
 
 `std_kind` is `embedded` or `directory`; a directory bundle also requires `std/`.
-The same exact Qleisli/std version invariant applies to both. An external verifier
-uses `{"kind":"external","protocol":<positive integer>,"path":"<relative file>"}`
-and requires that executable regular file inside the bundle. Embedded Rust has
-no external path or wire protocol. Commit fields describe the real upstream
+The same exact Qleisli/std version invariant applies to both. Schema 2 requires
+`{"kind":"qleisli-kernel","path":"<relative file>"}`. Schema 1 supports embedded
+Rust or `{"kind":"external","protocol":<positive integer>,"path":"<relative file>"}`.
+Every declared verifier path must resolve to an executable regular file inside
+the bundle. Commit fields describe the real upstream
 implementations; they are provenance, not correctness evidence. Unsupported
 schemas, component arrangements, or missing required fields reject installation.
 
@@ -518,8 +530,8 @@ with no installation, which is safe to retry. Only complete final directories
 with valid receipts count as installed. A final-name collision is validated as
 an existing installation or rejected, never overwritten.
 
-The installer-written `.qleisliup-receipt.json` has independent `schema: 1`
-and fields `qleisli`, `std`, `std_kind`, `qargo`, `qargo_checker_qleisli`, `host`,
+The installer-written `.qleisliup-receipt.json` uses the manifest's schema
+and tool suite fields alongside `qleisli`, `std`, `std_kind`, `host`,
 `verifier`, `manifest_target`, `manifest_sha256`, `artifact_target`,
 `artifact_sha256`, `artifact_size`, and `authenticated: true`. It accompanies the
 release before publication. Offline inspection requires this record, checks component
@@ -567,7 +579,7 @@ exists, reserved generations are uncommitted and eligible for removal.
 Open directory components without following symlinks and delete relative to their
 file descriptors. Preflight each candidate tree before deleting its contents;
 reject unexpected symlinks, special files, and crossings to a different filesystem.
-Interrupted bootstrap trees may contain the six canonical `bin` proxy symlinks,
+Interrupted bootstrap trees may contain the canonical `bin` proxy symlinks,
 each targeting exactly `qleisliup`; unlink these links without following them.
 Any other link target fails cleanup. Scan at most 4,096 entries per parent and
 remove at most 32 trees per pass. Each tree allows at most 200,000 descendants and
@@ -603,7 +615,7 @@ state temporaries: authenticated bundle files may legitimately use those names.
 client and trust repository as the manager. It detects the supported host and
 resolves the independent authenticated manager stable channel. The production
 source remains unconfigured; there is no embedded fixture root or endpoint
-override. Bootstrap installs the manager and six relative symlinks to `qleisliup`.
+override. Bootstrap installs the manager and eight relative symlinks to `qleisliup`.
 It installs no Qleisli toolchain and modifies no shell startup file. PATH setup
 is an explicit printed instruction to the user.
 
@@ -628,7 +640,7 @@ Only initial supported hosts are accepted. The channel's ordinary exact version,
 manifest version, host, immutable target path, SHA-256, and signed target size
 must agree. Manager artifacts are raw native executables bounded to 128 MiB;
 channel and manifest targets are bounded to 1 MiB. They are independent of
-Qleisli/std/qargo versions and toolchain archives.
+Qleisli, stdlib, and qrate tool suite versions and toolchain archives.
 
 After complete TUF verification, give the staged executable ordinary 0755
 permissions, reject text/scripts, and run only its `--version` probe with closed
@@ -649,8 +661,8 @@ archive-provided installation hooks.
 
 For bootstrap, require an absent `<home>/bin`, including refusing an existing
 empty directory, symlink, or unrelated command layout. Stage the complete bin
-directory on the home filesystem with the manager, six symlinks, and
-`.qleisliup-managed.json`: `{"schema":1,"host":"<host>","authenticated":true}`.
+directory on the home filesystem with the manager, eight symlinks, and
+`.qleisliup-managed.json` containing `{"schema":2,"host":"<host>","authenticated":true}`.
 Sync the contents and persist the manager identity before an exclusive atomic
 rename of the directory. Sync the home directory afterward. A rejected transaction
 never publishes a partial bin. Existing home state, toolchains, pins, and defaults
@@ -666,8 +678,10 @@ root ceremony, and publication operations are not configured by local Stages 1â€
 checks host/identity and rejects a downgrade, verifies a staged executable, and
 atomically replaces only a bootstrap-owned `<home>/bin/qleisliup`. Require the
 running executable's canonical path to be that managed path, the real bin
-directory, a valid ownership marker for the current host, and all six expected
-relative proxy links. Canonicalize both compared paths so invocation through a
+directory, a valid ownership marker for the current host, and all relative proxy
+links required by that marker. Schema 1 ownership requires the original six
+links. Schema 2 also requires `qlirgo` and `qlinties`. Canonicalize both compared
+paths so invocation through a
 symlink or filesystem case alias of the same executable remains valid. The
 managed destination itself must still be a regular file, not a symlink.
 Require an executable regular file with one hardlink, no
@@ -702,5 +716,5 @@ install command updates the manager implicitly.
   documents the persistent datastore and expiration enforcement settings.
 - [tough Repository](https://docs.rs/tough/0.24.0/tough/struct.Repository.html)
   documents that target streams must finish verification before their bytes are used.
-- [Qargo toolchain design](https://github.com/MGYamada/qargo/blob/v0.1.5/docs/toolchains.md)
-  distinguishes its linked checker from a future external toolchain protocol.
+- [Qlirgo toolchain design](https://github.com/MGYamada/qlirgo/blob/v0.2.0/docs/toolchains.md)
+  describes the linked frontend and the native acceptance boundary.

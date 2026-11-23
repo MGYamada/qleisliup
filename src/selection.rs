@@ -209,7 +209,7 @@ pub(crate) fn list(home: &Home) -> Result<String> {
     }
 }
 
-pub(crate) fn show(toolchain: &Toolchain, source: &Source) -> String {
+pub(crate) fn show(toolchain: &Toolchain, source: &Source) -> Result<String> {
     let mut text = format!(
         "active toolchain\nname: {}\nsource: {}\nhost: {}\npath: {}\nkind: {}\nauthentication: {}\n",
         toolchain.name,
@@ -228,13 +228,10 @@ pub(crate) fn show(toolchain: &Toolchain, source: &Source) -> String {
         }
     );
     if let Some(manifest) = &toolchain.manifest {
+        let (suite, version, checker) = manifest.suite()?;
         text.push_str(&format!(
-            "qleisli: {}\nstd: {} ({:?})\nqargo: {}\nqargo checker Qleisli: {}\n",
-            manifest.qleisli,
-            manifest.std,
-            manifest.std_kind,
-            manifest.qargo,
-            manifest.qargo_checker_qleisli
+            "qleisli: {}\nstd: {} ({:?})\n{suite}: {version}\n{suite} checker Qleisli: {checker}\n",
+            manifest.qleisli, manifest.std, manifest.std_kind
         ));
         match &manifest.verifier {
             crate::toolchain::Verifier::EmbeddedRust => {
@@ -243,14 +240,17 @@ pub(crate) fn show(toolchain: &Toolchain, source: &Source) -> String {
             crate::toolchain::Verifier::External { protocol, path } => text.push_str(&format!(
                 "verifier: external, protocol {protocol}, {path}\n"
             )),
+            crate::toolchain::Verifier::QleisliKernel { path } => {
+                text.push_str(&format!("verifier: Qleisli native kernel, {path}\n"));
+            }
         }
-        if manifest.qleisli != manifest.qargo_checker_qleisli {
-            text.push_str(
-                "qargo checking uses its linked checker, independently of the selected compiler.\n",
-            );
+        if manifest.qleisli != checker {
+            text.push_str(&format!(
+                "{suite} checking uses its linked checker, independently of the selected compiler.\n"
+            ));
         }
     } else {
         text.push_str("component versions: unknown (no internal manifest)\n");
     }
-    text
+    Ok(text)
 }

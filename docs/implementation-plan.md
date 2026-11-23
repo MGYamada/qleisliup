@@ -1,8 +1,8 @@
-# qleisliup 0.1.5 implementation plan
+# qleisliup 0.1.6 implementation plan
 
 ## Delivery boundary
 
-Development is temporarily suspended at version 0.1.5 while the maintainer
+Development is temporarily suspended at version 0.1.6 while the maintainer
 focuses on developing Qleisli itself.
 
 The current delivery is **Stage 4: bootstrap and manager self-update**, following
@@ -10,13 +10,17 @@ offline selection, exact defaults/pins, local links, Unix proxies, and TUF
 transactional toolchain installation, together
 with the adopted [specification](specification.md), development files, tests,
 and CI. Production endpoints/trust remain unconfigured. The Cargo package
-version is 0.1.5, with a source release for crates.io and GitHub. The package
-includes no prebuilt manager binary or available Qleisli distribution.
+version is 0.1.6, prepared for source distribution on crates.io and GitHub. The
+package includes no prebuilt manager binary or available Qleisli distribution.
+
+The Qleisli 0.3.0 and qlirgo 0.2.0 pair uses schema 2 manifests and receipts,
+with `qlirgo` and `qlinties` proxies and native kernel selection. Schema 1
+toolchains and bootstrap ownership are supported for existing installations.
 
 Keep delivery in this order: **local selection → links and proxies → TUF and
 transactional installation → bootstrap and self-update**. Each later stage
-requires an explicit follow-up implementation task. Do not change Qleisli or
-qargo as part of local development.
+requires an explicit follow-up implementation task. Upstream component changes
+belong to the Qleisli and qlirgo repositories.
 
 The next requested delivery goal is **Cargo-free end-user installation and
 version management**. The native client implementation is present; native
@@ -314,7 +318,7 @@ builds qleisliup and qleisliup-init from the shared private core. No public
 integration library is introduced, and qleisliup remains the default run target.
 Bootstrap authenticates the independent manager channel/manifest/native target,
 verifies a staged executable and its version, then atomically publishes the
-manager, six proxy links, and immutable ownership marker as one bin directory.
+manager, eight proxy links, and immutable ownership marker as one bin directory.
 It requires an absent bin destination and leaves shell files and selection alone.
 
 Self-update checks the managed path, ownership marker, hardlink count, local
@@ -334,7 +338,7 @@ prerequisites below before these commands can perform live installations.
 
 | Acceptance scenario | Required result |
 | --- | --- |
-| Bootstrap into a fresh managed home | Install the authenticated manager and six proxy symlinks; no toolchain install. |
+| Bootstrap into a fresh managed home | Install the authenticated manager and its proxy symlinks; no toolchain install. |
 | Existing unrelated command at a destination | Refuse to overwrite it; leave it usable. |
 | Unsupported host | Fail before downloading or changing state. |
 | Invalid manager target, download/interruption/staging failure | Keep the old manager and its proxies usable. |
@@ -491,7 +495,7 @@ upload or production trust configuration is added.
 
 Remaining delivery work, in order:
 
-1. Validate independently produced native Qleisli/qargo bundles, exact component
+1. Validate independently produced native Qleisli/qlirgo bundles, exact component
    identities, embedded stdlib/verifier arrangements, and real host linkage.
 2. Establish the production TUF authority, endpoint ownership, initial public
    root, rotation/expiry policy, and verified bootstrap acquisition method.
@@ -510,7 +514,7 @@ after its upstream distribution/compatibility gates. Python wheel delivery,
 exactly locked sample projects, and compatibility CI are a separate upstream
 task. Keep interpreter/package acquisition outside native operations and retain
 the current CLI, pin schema, verifier authority, and TUF trust boundary. No
-cross-language dependency resolver or qargo build hooks are introduced.
+cross-language dependency resolver or qlirgo build hooks are introduced.
 
 ### Preparation validation, 2026-10-03
 
@@ -859,7 +863,7 @@ verification method. These require a separate production configuration task;
 missing configuration must fail closed rather than silently use fixtures.
 
 Validate Cargo-free bundles on macOS ARM64/x86_64 and Linux x86_64 musl, including
-CPU identity, linkage, the real qargo checker binding, and install/exec behavior.
+CPU identity, linkage, the real qlirgo checker binding, and install/exec behavior.
 Plan Windows and Linux ARM64 only in a later scope. A source build or a receipt
 does not establish distribution readiness or a mathematical guarantee.
 
